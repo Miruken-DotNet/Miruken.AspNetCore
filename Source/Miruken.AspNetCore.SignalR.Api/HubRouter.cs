@@ -11,7 +11,7 @@
     using Miruken.Api.Route;
 
     [Routes("hub")]
-    public class HubRouter : Handler, IDisposable
+    public class HubRouter : Handler, IDisposable, IAsyncDisposable
     {
         private readonly ConcurrentDictionary<Uri, HubConnection>
             _connections = new ConcurrentDictionary<Uri, HubConnection>();
@@ -172,7 +172,7 @@
             return connection;
         }
 
-        public static async Task ConnectWithRetryAsync(HubConnection connection, Uri url)
+        private static async Task ConnectWithRetryAsync(HubConnection connection, Uri url)
         {
             var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
 
@@ -227,20 +227,25 @@
 #endif
                 ;
         }
-
-        public void Dispose()
+        
+        public async ValueTask DisposeAsync()
         {
             foreach (var connection in _connections.Values)
             {
                 try
                 {
-                    connection.DisposeAsync().Wait();
+                    await connection.DisposeAsync();
                 }
                 catch
                 {
                     // Ignore
                 }
             }
+        }
+        
+        public void Dispose()
+        {   
+            DisposeAsync().GetAwaiter().GetResult();
         }
     }
 }
