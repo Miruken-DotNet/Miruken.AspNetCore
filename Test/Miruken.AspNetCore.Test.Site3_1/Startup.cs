@@ -1,7 +1,6 @@
 namespace Miruken.AspNetCore.Test.Site3_1
 {
     using Microsoft.AspNetCore.Builder;
-    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.OpenApi.Models;
     using Register;
@@ -11,15 +10,10 @@ namespace Miruken.AspNetCore.Test.Site3_1
 
     public class Startup
     {
-        public Startup(IConfiguration configuration)
-        {
-            Configuration = configuration;
-        }
-
-        public IConfiguration Configuration { get; }
-
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddCors();
+            
             services.AddMvc(config =>
             {
                 config.Filters.Add(typeof(ApiExceptionFilter));
@@ -45,6 +39,12 @@ namespace Miruken.AspNetCore.Test.Site3_1
 
         public void Configure(IApplicationBuilder app)
         {
+            app.UseCors(builder => 
+                builder.AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+            );
+            
             app.UseRouting()
                 .UseEndpoints(endpoints => endpoints.MapControllers());
 
