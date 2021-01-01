@@ -1,6 +1,7 @@
 ﻿namespace Miruken.AspNetCore.Tests
 {
     using System;
+    using System.Net.Http;
     using System.Threading.Tasks;
     using Api;
     using Api.Route;
@@ -380,7 +381,7 @@
         }
 
         [TestMethod,
-         ExpectedException(typeof(UnknownExceptionPayload))]
+         ExpectedException(typeof(UnsupportedMediaTypeException))]
         public async Task Should_Fail_ActionResult_Requests()
         {
             var player = new Player

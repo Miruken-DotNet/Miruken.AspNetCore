@@ -29,10 +29,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Miruken" Version="4.1.6-Alpha.13" />
-    <PackageReference Include="Miruken.Http" Version="4.1.6-Alpha.13" />
+    <PackageReference Include="Miruken" Version="4.1.6-Alpha.18" />
+    <PackageReference Include="Miruken.Http" Version="4.1.6-Alpha.18" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.0-beta-20204-02" PrivateAssets="All" />
-    <PackageReference Include="Miruken.Validate" Version="4.1.6-Alpha.13" />
+    <PackageReference Include="Miruken.Validate" Version="4.1.6-Alpha.18" />
   </ItemGroup>
 
   <ItemGroup Condition="$(DefineConstants.Contains('NETSTANDARD2_0'))">
