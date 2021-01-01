@@ -57,7 +57,7 @@
         private static (object, bool) ExtractRequest(object payload)
         {
             if (payload == null)
-                throw new ArgumentException("Request payload is missing");
+                throw new ArgumentException("Request payload is missing.");
 
             return payload switch
             {
@@ -67,7 +67,7 @@
                 JObject json =>     /* Newtonsoft.Json */
                     (JsonSerializer.Deserialize(new JTokenReader(json)), false),
                 _ => throw new InvalidOperationException(
-                        $"Unrecognized payload type '{payload.GetType().FullName}'")
+                        $"Unrecognized payload type '{payload.GetType().FullName}.'")
             };
         }
 

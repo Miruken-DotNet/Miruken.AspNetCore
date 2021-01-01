@@ -20,7 +20,10 @@
         private const string Publish = "Publish";
 
         [Handles]
-        public async Task<object> Route(Routed routed, Command command, IHandler composer)
+        public async Task<object> Route(
+            Routed   routed,
+            Command  command,
+            IHandler composer)
         {
             Uri url;
             try
@@ -49,7 +52,9 @@
         }
 
         [Handles]
-        public async Task<HubConnectionInfo> Connect(HubConnect connect, IHandler composer)
+        public async Task<HubConnectionInfo> Connect(
+            HubConnect connect,
+            IHandler   composer)
         {
             var connection = await GetConnection(connect.Url, composer, connect);
             return GetConnectionInfo(connection, connect.Url);
@@ -82,9 +87,7 @@
 
             await Disconnect(url);
 
-            var options = new HubOptions();
-            composer.Handle(options, true);
-
+            var options     = composer.GetOptions<HubOptions>() ?? new HubOptions();
             var httpOptions = options.HttpOptions;
             var transport   = options.HttpTransportType;
 
@@ -100,11 +103,9 @@
                 connectionBuilder = connectionBuilder.WithUrl(url, transport.Value);
             else
                 connectionBuilder = connectionBuilder.WithUrl(url);
-
-#if NETSTANDARD2_1
+            
             connectionBuilder = connectionBuilder.WithAutomaticReconnect();
-#endif
-               
+
             connectionBuilder = connectionBuilder.AddNewtonsoftJsonProtocol(json =>
                 {
                     json.PayloadSerializerSettings =
@@ -150,29 +151,28 @@
                 .Publish(message.Payload));
 
             await ConnectWithRetryAsync(connection, url);
-
-#if NETSTANDARD2_1
+            
             connection.Reconnecting += exception => notify.Send(
                 new HubReconnecting
                 {
                     ConnectionInfo = GetConnectionInfo(connection, url),
                     Exception      = exception
                 });
-
-
+            
             connection.Reconnected += connectionId => notify.Send(
                 new HubReconnected
                 {
                     ConnectionInfo  = GetConnectionInfo(connection, url),
                     NewConnectionId = connectionId
                 });
-#endif
 
             _connections[url] = connection;
             return connection;
         }
 
-        private static async Task ConnectWithRetryAsync(HubConnection connection, Uri url)
+        private static async Task ConnectWithRetryAsync(
+            HubConnection connection,
+            Uri           url)
         {
             var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
 
@@ -185,7 +185,7 @@
                 }
                 catch when (timeout.IsCancellationRequested)
                 {
-                    throw new TimeoutException($"Unable to connect to the Hub at {url}");
+                    throw new TimeoutException($"Unable to connect to the Hub at {url}.");
                 }
                 catch
                 {
@@ -217,15 +217,14 @@
             }
         }
 
-        private static HubConnectionInfo GetConnectionInfo(HubConnection connection, Uri url)
+        private static HubConnectionInfo GetConnectionInfo(
+            HubConnection connection,
+            Uri           url)
         {
             return new HubConnectionInfo(url)
-#if NETSTANDARD2_1
                 {
                     Id = connection.ConnectionId
-                }
-#endif
-                ;
+                };
         }
         
         public async ValueTask DisposeAsync()

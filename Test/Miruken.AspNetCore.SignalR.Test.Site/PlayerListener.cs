@@ -46,7 +46,6 @@
         {
             var connectionInfo = closed.ConnectionInfo;
             _logger.LogInformation($"Client disconnected from {connectionInfo.Url}");
-
         }
     }
 }

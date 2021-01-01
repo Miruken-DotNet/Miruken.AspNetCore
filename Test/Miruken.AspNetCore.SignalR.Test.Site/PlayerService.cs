@@ -26,9 +26,9 @@
                 {
 
                 })
-                .ConnectHub("https://localhost:44305/hub/miruken");
-
-            await Task.Delay(10000, stoppingToken);
+                .ConnectHub("https://localhost:5001/hub/miruken");
+            
+            await Task.Delay(3000, stoppingToken);
 
             var response = await _handler.Send(new CreatePlayer
             {
@@ -40,10 +40,10 @@
                         DOB = new DateTime(2007, 6, 14)
                     }
                 }
-            }.RouteTo("hub:https://localhost:44305/hub/miruken"));
+            }.RouteTo("hub:https://localhost:5001/hub/miruken"));
 
             await _handler.Publish(response
-                .RouteTo("hub:https://localhost:44305/hub/miruken"));
+                .RouteTo("hub:https://localhost:5001/hub/miruken"));
         }
     }
 }

@@ -41,8 +41,8 @@ namespace Miruken.AspNetCore.Test.Site3_1
         {
             app.UseCors(builder => 
                 builder.AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
+                       .AllowAnyMethod()
+                       .AllowAnyHeader()
             );
             
             app.UseRouting()

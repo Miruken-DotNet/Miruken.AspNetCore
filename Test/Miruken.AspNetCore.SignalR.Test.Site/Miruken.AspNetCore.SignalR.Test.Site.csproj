@@ -10,6 +10,8 @@
     <ProjectReference Include="..\Miruken.AspNetCore.Tests\Miruken.AspNetCore.Tests.csproj" />
   </ItemGroup>
 
-
-
+  <ItemGroup>
+    <_ContentIncludedByDefault Remove=" wwwroot\js\signalr\package.json" />
+  </ItemGroup>
+  
 </Project>

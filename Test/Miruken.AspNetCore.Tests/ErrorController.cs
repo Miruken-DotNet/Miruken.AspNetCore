@@ -14,8 +14,8 @@
             return new ContentResult
             {
                 Content = @"{
-                       'payload': {
-                           '$type': 'Miruken.AspNetCore.Tests.NoMappingController+SomeError, Miruken.AspNetCore.Tests'
+                       ""payload"": {
+                           ""$type"": ""Miruken.AspNetCore.Tests.NoMappingController+SomeError, Miruken.AspNetCore.Tests""
                         }
                     }",
                 ContentType = "application/json",
@@ -33,8 +33,8 @@
             return new ContentResult
             {
                 Content = @"{
-                       'payload': {
-                           '$type': 'Miruken.AspNetCore.Tests.SomeError, Miruken.AspNetCore.Tests'
+                       ""payload"": {
+                           ""$type"": ""Miruken.AspNetCore.Tests.SomeError, Miruken.AspNetCore.Tests""
                         }
                     }",
                 ContentType = "application/json",
@@ -52,8 +52,8 @@
             return new ContentResult
             {
                 Content = @"{
-                       'payload': {
-                           '$type': 'Miruken.AspNetCore.Tests.SomeError, Miruken.AspNetCore.Tests'
+                       ""payload"": {
+                           ""$type"": ""Miruken.AspNetCore.Tests.SomeError, Miruken.AspNetCore.Tests""
                         }
                     }",
                 ContentType = "application/json",
