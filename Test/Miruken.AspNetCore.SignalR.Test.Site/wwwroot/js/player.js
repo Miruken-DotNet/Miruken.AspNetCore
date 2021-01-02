@@ -1,50 +1,50 @@
 ﻿"use strict";
 
-var connection = new signalR.HubConnectionBuilder()
-    .withUrl("/hub/miruken")
-    .build();
+define(['exports', '@miruken/core', '@miruken/http', './player-api'], function (exports, miruken, http, playerApi) { 'use strict';
 
-//Disable send button until connection is established
-document.getElementById("createPlayer").disabled = true;
+    const handler = new miruken.HandlerBuilder()
+        .withSignalR()
+        .build();
+    
+    document.getElementById("createPlayer").disabled = true;
 
-connection.on("Publish", ({ payload }) => {
-    const player = payload.player,
-          li     = document.createElement("li");
-    li.textContent = `Player ${player.id} created (${player.name})`;
-    document.getElementById("messagesList").appendChild(li);
-});
+    handler.$hubConnect("/hub/miruken").then(_ => {
+        document.getElementById("createPlayer").disabled = false;
+        document.getElementById("createPlayer").addEventListener("click", event => {
+            const name = document.getElementById("playerName").value,
+                  dob  = document.getElementById("playerDOB").value;
+            createPlayer(handler, name, dob);
+            event.preventDefault();
+        });
+    }).catch(error => console.error(error));
 
-connection.start().then(function () {
-    document.getElementById("createPlayer").disabled = false;
-}).catch(function (err) {
-    return console.error(err.toString());
-});
+    handler.$accepts(playerApi.PlayerCreated, created => {
+        const player = created.player,
+              li     = document.createElement("li");
+        li.textContent = `Player ${player.id} created (${player.name})`;
+        document.getElementById("messagesList").appendChild(li);
+    });
 
-document.getElementById("createPlayer").addEventListener("click", function (event) {
-    const name = document.getElementById("playerName").value,
-          dob  = document.getElementById("playerDOB").value;
-
-    connection.invoke("Process", {
-            "payload": {
-                "$type": "Miruken.AspNetCore.Tests.CreatePlayer, Miruken.AspNetCore.Tests",
-                "player": {
-                    "name": name,
-                    "person": {
-                        "dob": dob
-                    }
-                }
-            }
-        })
-        .then(({ payload }) => {
-            const player = payload.player,
-                  li     = document.createElement("li");
-            li.textContent = `Player ${player.id} created (${player.name})`;
+    handler.$accepts(playerApi.PlayerUpdated, created => {
+        const player = created.player,
+              li     = document.createElement("li");
+        li.textContent = `Player ${player.id} updated (${player.name})`;
+        document.getElementById("messagesList").appendChild(li);
+    });
+    
+    function createPlayer(handler, name, dob) {
+        const player = new playerApi.Player().extend({ name, dob });
+        handler.$send(new playerApi.CreatePlayer(player)
+                .routeTo("hub:/hub/miruken")).then(response => {
+            const newPlayer = response.player,
+                  li        = document.createElement("li");
+            li.textContent = `Player ${newPlayer.id} created (${newPlayer.name})`;
             document.getElementById("messagesList").appendChild(li);
-            connection.invoke("Publish", { payload });
-        })
-        .catch(err => {
+            handler.$publish(new playerApi.PlayerCreated(newPlayer)
+                   .routeTo("hub:/hub/miruken"));
+        }).catch(err => {
             return console.error(err.toString());
         });
-
-    event.preventDefault();
+    }
 });
+

@@ -1,8 +1,4 @@
-(function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('reflect-metadata')) :
-  typeof define === 'function' && define.amd ? define(['exports', 'reflect-metadata'], factory) :
-  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.mirukenCore = {}));
-}(this, (function (exports) { 'use strict';
+define(['exports', 'reflect-metadata'], function (exports, reflectMetadata) { 'use strict';
 
   /*
     base2 - copyright 2007-2009, Dean Edwards
@@ -5518,7 +5514,7 @@
   }, (_applyDecoratedDescriptor(_class2.prototype, "provide", [provides], Object.getOwnPropertyDescriptor(_class2.prototype, "provide"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "get", [_dec$8], Object.getOwnPropertyDescriptor(_class2.prototype, "get"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "put", [_dec2], Object.getOwnPropertyDescriptor(_class2.prototype, "put"), _class2.prototype), _applyDecoratedDescriptor(_class2.prototype, "drop", [_dec3], Object.getOwnPropertyDescriptor(_class2.prototype, "drop"), _class2.prototype)), _class2)) || _class$9);
 
   Handler.implement({
-    send(request) {
+    $send(request) {
       if ($isNothing(request)) return;
       var command = new Command(request);
 
@@ -5529,7 +5525,7 @@
       return command.callbackResult;
     },
 
-    publish(notification) {
+    $publish(notification) {
       if ($isNothing(notification)) return;
       var command = new Command(notification, true);
 
@@ -5542,30 +5538,64 @@
 
   });
 
-  class Message extends exports.Base {}
-  class MessageWrapper extends exports.Base {
-    constructor(message) {
-      if (new.target === MessageWrapper) {
-        throw new TypeError("MessageWrapper cannot be instantiated.");
+  Handler.implement({
+    stashGet(key) {
+      var get = new StashAction.Get(key);
+
+      if (!this.handle(get)) {
+        throw new NotHandledError(get);
       }
 
-      super();
+      return get.value;
+    },
 
-      _defineProperty(this, "message", void 0);
+    stashPut(value, key) {
+      var actualKey = key || $classOf(value);
 
-      this.message = message;
-    }
-
-    getCacheKey() {
-      var message = this.message,
-          messageKey = message == null ? void 0 : message.getCacheKey == null ? void 0 : message.getCacheKey();
-
-      if (!$isNothing(messageKey)) {
-        return JSON.stringify(this, (name, value) => name === "message" ? `${assignID($classOf(message))}#${messageKey}` : value);
+      if ($isNothing(actualKey)) {
+        throw new Error("The key could not be inferred.");
       }
+
+      var put = new StashAction.Put(actualKey, value);
+
+      if (!this.handle(put)) {
+        throw new NotHandledError(put);
+      }
+    },
+
+    stashDrop(key) {
+      var drop = new StashAction.Drop(key);
+
+      if (!this.handle(drop)) {
+        throw new NotHandledError(drop);
+      }
+    },
+
+    stashTryGet(key) {
+      var get = new StashAction.Get(key);
+      if (this.handle(get)) return get.value;
+    },
+
+    stashGetOrPut(key, value) {
+      var data = this.stashTryGet(key);
+
+      if ($isNothing(data)) {
+        data = $isFunction(value) ? value() : value;
+
+        if ($isPromise(data)) {
+          return data.then(result => {
+            this.stashPut(result, key);
+            return result;
+          });
+        }
+
+        this.stashPut(data, key);
+      }
+
+      return data;
     }
 
-  }
+  });
 
   class Request extends exports.Base {
     getCacheKey() {
@@ -5596,6 +5626,31 @@
 
       if (!$isNothing(requestKey)) {
         return JSON.stringify(this, (name, value) => name === "request" ? `${assignID($classOf(request))}#${requestKey}` : value);
+      }
+    }
+
+  }
+
+  class Message extends exports.Base {}
+  class MessageWrapper extends exports.Base {
+    constructor(message) {
+      if (new.target === MessageWrapper) {
+        throw new TypeError("MessageWrapper cannot be instantiated.");
+      }
+
+      super();
+
+      _defineProperty(this, "message", void 0);
+
+      this.message = message;
+    }
+
+    getCacheKey() {
+      var message = this.message,
+          messageKey = message == null ? void 0 : message.getCacheKey == null ? void 0 : message.getCacheKey();
+
+      if (!$isNothing(messageKey)) {
+        return JSON.stringify(this, (name, value) => name === "message" ? `${assignID($classOf(message))}#${messageKey}` : value);
       }
     }
 
@@ -5765,68 +5820,166 @@
     typeInfo.keyResolver = new StashOfResolver(stashKey);
   });
 
-  Handler.implement({
-    stashGet(key) {
-      var get = new StashAction.Get(key);
+  var _$g = createKeyChain();
 
-      if (!this.handle(get)) {
-        throw new NotHandledError(get);
+  class Resolving extends Inquiry {
+    constructor(key, callback) {
+      if ($isNothing(callback)) {
+        throw new Error("The callback argument is required.");
       }
 
-      return get.value;
-    },
-
-    stashPut(value, key) {
-      var actualKey = key || $classOf(value);
-
-      if ($isNothing(actualKey)) {
-        throw new Error("The key could not be inferred.");
+      if (callback instanceof Inquiry) {
+        super(key, true, callback);
+      } else {
+        super(key, true);
       }
 
-      var put = new StashAction.Put(actualKey, value);
-
-      if (!this.handle(put)) {
-        throw new NotHandledError(put);
-      }
-    },
-
-    stashDrop(key) {
-      var drop = new StashAction.Drop(key);
-
-      if (!this.handle(drop)) {
-        throw new NotHandledError(drop);
-      }
-    },
-
-    stashTryGet(key) {
-      var get = new StashAction.Get(key);
-      if (this.handle(get)) return get.value;
-    },
-
-    stashGetOrPut(key, value) {
-      var data = this.stashTryGet(key);
-
-      if ($isNothing(data)) {
-        data = $isFunction(value) ? value() : value;
-
-        if ($isPromise(data)) {
-          return data.then(result => {
-            this.stashPut(result, key);
-            return result;
-          });
-        }
-
-        this.stashPut(data, key);
-      }
-
-      return data;
+      _$g(this).callback = callback;
     }
 
-  });
+    get callback() {
+      return _$g(this).callback;
+    }
+
+    get succeeded() {
+      return _$g(this).succeeded;
+    }
+
+    guardDispatch(handler, binding) {
+      var outer = super.guardDispatch(handler, binding);
+
+      if (outer) {
+        var callback = _$g(this).callback,
+            guardDispatch = callback.guardDispatch;
+
+        if ($isFunction(guardDispatch)) {
+          var inner = guardDispatch.call(callback, handler, binding);
+
+          if (!inner) {
+            if ($isFunction(outer)) {
+              outer.call(this);
+            }
+
+            return inner;
+          }
+
+          if ($isFunction(inner)) {
+            if ($isFunction(outer)) {
+              return function () {
+                inner.call(callback);
+                outer.call(this);
+              };
+            }
+
+            return inner;
+          }
+        }
+      }
+
+      return outer;
+    }
+
+    isSatisfied(resolution, greedy, composer) {
+      if (_$g(this).succeeded && !greedy) return true;
+      var callback = this.callback,
+          handled = CallbackPolicy.dispatch(resolution, callback, greedy, composer);
+
+      if (handled) {
+        _$g(this).succeeded = true;
+      }
+
+      return handled;
+    }
+
+    toString() {
+      return `Resolving | ${this.key} => ${this.callback}`;
+    }
+
+  }
+
+  class InferenceHandler extends Handler {
+    constructor(...types) {
+      super();
+      var owners = new Set(),
+          inferDescriptor = HandlerDescriptor.get(this, true);
+
+      for (var type of types.flat()) {
+        addStaticBindings(type, inferDescriptor);
+        addInstanceBindings(type, inferDescriptor, owners);
+      }
+    }
+
+  }
+
+  function addStaticBindings(type, inferDescriptor) {
+    var typeDescriptor = HandlerDescriptor.get(type);
+
+    if (!$isNothing(typeDescriptor)) {
+      for (var [policy, bindings] of typeDescriptor.bindings) {
+        for (var binding of bindings) {
+          var typeBinding = pcopy(binding);
+          typeBinding.handler = binding.handler.bind(type);
+          inferDescriptor.addBinding(policy, typeBinding);
+        }
+      }
+    }
+  }
+
+  function addInstanceBindings(type, inferDescriptor, owners) {
+    var prototype = type.prototype;
+    if ($isNothing(prototype) || owners.has(prototype)) return;
+
+    function inferShim(...args) {
+      return infer.call(this, type, ...args);
+    }
+
+    for (var descriptor of HandlerDescriptor.getChain(prototype)) {
+      if (!owners.add(descriptor.owner)) break;
+
+      for (var [policy, bindings] of descriptor.bindings) {
+        for (var binding of bindings) {
+          var instanceBinding = pcopy(binding);
+          instanceBinding.handler = inferShim;
+          instanceBinding.getMetadata = Undefined$1;
+          instanceBinding.getParentMetadata = Undefined$1;
+          instanceBinding.skipFilters = true;
+          inferDescriptor.addBinding(policy, instanceBinding);
+        }
+      }
+    }
+  }
+
+  function infer(type, callback, {
+    rawCallback,
+    composer,
+    results
+  }) {
+    if (rawCallback.canInfer === false) {
+      return $unhandled;
+    }
+
+    var resolving = new Resolving(type, rawCallback);
+
+    if (!composer.handle(resolving, false, composer)) {
+      return $unhandled;
+    }
+
+    if (results) {
+      var result = resolving.callbackResult;
+
+      if ($isPromise(result)) {
+        results(result.then(() => {
+          if (!resolving.succeeded) {
+            throw new NotHandledError(callback);
+          }
+        }));
+      }
+    }
+  }
 
   var _class$b;
 
-  var _$g = createKeyChain();
+  var _$h = createKeyChain();
   /**
    * Encapsulates zero or more
    * {{#crossLink "Handler"}}{{/crossLink}}.<br/>
@@ -5841,18 +5994,18 @@
   var CompositeHandler = unmanaged(_class$b = class CompositeHandler extends Handler {
     constructor(...handlers) {
       super();
-      _$g(this).handlers = [];
+      _$h(this).handlers = [];
       this.addHandlers(handlers);
     }
 
     getHandlers() {
-      return _$g(this).handlers.slice();
+      return _$h(this).handlers.slice();
     }
 
     addHandlers(...handlers) {
       handlers = $flatten(handlers, true).filter(h => this.findHandler(h) == null).map(Handler.for);
 
-      _$g(this).handlers.push(...handlers);
+      _$h(this).handlers.push(...handlers);
 
       return this;
     }
@@ -5860,14 +6013,14 @@
     insertHandlers(atIndex, ...handlers) {
       handlers = $flatten(handlers, true).filter(h => this.findHandler(h) == null).map(Handler.for);
 
-      _$g(this).handlers.splice(atIndex, 0, ...handlers);
+      _$h(this).handlers.splice(atIndex, 0, ...handlers);
 
       return this;
     }
 
     removeHandlers(...handlers) {
       $flatten(handlers, true).forEach(handler => {
-        var handlers = _$g(this).handlers,
+        var handlers = _$h(this).handlers,
             count = handlers.length;
 
         for (var idx = 0; idx < count; ++idx) {
@@ -5883,7 +6036,7 @@
     }
 
     findHandler(handler) {
-      for (var h of _$g(this).handlers) {
+      for (var h of _$h(this).handlers) {
         if (h === handler) return h;
 
         if (h instanceof HandlerAdapter && h.handler === handler) {
@@ -5896,7 +6049,7 @@
       var handled = super.handleCallback(callback, greedy, composer);
       if (handled && !greedy) return true;
 
-      for (var handler of _$g(this).handlers) {
+      for (var handler of _$h(this).handlers) {
         if (handler.handle(callback, greedy, composer)) {
           if (!greedy) return true;
           handled = true;
@@ -5908,70 +6061,224 @@
 
   }) || _class$b;
 
-  var _dec$a, _class$c;
+  var _dec$a, _class$c, _dec2$1, _class2$1;
 
-  var _$h = createKeyChain();
-  /**
-   * Protocol to participate in batched operations.
-   * @class Batching
-   * @extends Protocol
-   */
+  var _$i = createKey();
 
-
-  var Batching = Protocol.extend({
-    /**
-     * Completes the batching operation.
-     * @method complete
-     * @param   {Handler}  composer  - composition handler
-     * @returns {Any} the batching result.
-     */
-    complete(composer) {}
-
-  });
-  /**
-   * Coordinates batching operations through the protocol
-   * {{#crossLink "Batching"}}{{/crossLink}}.
-   * @class BatchingComplete
-   * @uses Batching
-   */
-
-  var BatchingComplete = Protocol.extend({
-    /**
-     * Completes the batching operation.
-     * @method complete
-     * @param   {Handler}  composer  - composition handler
-     * @returns {Array|Promise(Array)} an array or promise of array.
-     */
-    complete(composer) {}
-
-  });
-  var Batch = (_dec$a = conformsTo(BatchingComplete), _dec$a(_class$c = class Batch extends CompositeHandler {
-    constructor(...tags) {
-      super();
-      _$h(this).tags = $flatten(tags, true);
+  var Lifestyle = (_dec$a = conformsTo(Filtering), _dec$a(_class$c = class Lifestyle {
+    constructor() {
+      if (new.target === Lifestyle) {
+        throw new TypeError("Lifestyle cannot be instantiated.");
+      }
     }
 
-    shouldBatch(tag) {
-      var tags = _$h(this).tags;
-
-      return tag && (tags.length == 0 || tags.indexOf(tag) >= 0);
+    get order() {
+      return Number.MAX_SAFE_INTEGER - 1000;
     }
 
-    complete(composer) {
-      var results = this.getHandlers().reduce((res, handler) => {
-        var result = Batching(handler).complete(composer);
-        return result ? [...res, result] : res;
-      }, []);
-      return results.some($isPromise) ? Promise.all(results) : results;
+    next(callback, context) {
+      var parent = callback.parent,
+          isCompatible = this.isCompatibleWithParent;
+
+      if ($isNothing(parent) || !$isFunction(isCompatible) || isCompatible.call(this, parent, context)) {
+        var getInstance = this.getInstance;
+
+        if ($isFunction(getInstance)) {
+          try {
+            var instance = getInstance.call(this, callback, context);
+            if (!$isNothing(instance)) return instance;
+          } catch (ex) {// fall through
+          }
+        } else {
+          return context.next();
+        }
+      }
+
+      return context.abort();
     }
 
   }) || _class$c);
-  class NoBatch extends Trampoline {
-    get canBatch() {
-      return false;
+  var LifestyleProvider = (_dec2$1 = conformsTo(FilteringProvider), _dec2$1(_class2$1 = class LifestyleProvider {
+    constructor(lifestyle) {
+      if ($isNothing(lifestyle)) {
+        throw new Error("The lifestyle argument is required.");
+      }
+
+      if (!(lifestyle instanceof Lifestyle)) {
+        throw new TypeError("The lifestyle argument is not a Lifestyle.");
+      }
+
+      _$i(this).lifestyle = [lifestyle];
+    }
+
+    get required() {
+      return true;
+    }
+
+    appliesTo(callback) {
+      return callback instanceof Inquiry;
+    }
+
+    getFilters(binding, callback, composer) {
+      return _$i(this).lifestyle;
+    }
+
+  }) || _class2$1);
+
+  var _$j = createKey();
+
+  class SingletonLifestyle extends Lifestyle {
+    getInstance(inquiry, {
+      next
+    }) {
+      var instance = _$j(this).instance;
+
+      if ($isNothing(instance)) {
+        instance = _$j(this).instance = next();
+
+        if ($isPromise(instance)) {
+          _$j(this).instance = instance = instance.then(result => _$j(this).instance = result).catch(() => _$j(this).instance = null);
+        }
+      }
+
+      return instance;
     }
 
   }
+  class SingletonLifestyleProvider extends LifestyleProvider {
+    constructor() {
+      super(new SingletonLifestyle());
+    }
+
+  }
+  var singleton = createFilterDecorator(() => new SingletonLifestyleProvider());
+
+  var _dec$b, _dec2$2, _dec3$1, _class$d;
+  /**
+   * Protocol for handling and reporting errors.
+   * @class Errors
+   * @extends Protocol
+   */
+
+  var Errors = DuckTyping.extend({
+    /**
+     * Handles an error.
+     * @method handlerError
+     * @param   {Any}          error      - error (usually Error)
+     * @param   {Any}          [context]  - scope of error
+     * @returns {Promise} promise of handled error.
+     */
+    handleError(error, context) {},
+
+    /**
+     * Handles an exception.
+     * @method handlerException
+     * @param   {Exception}    excption   - exception
+     * @param   {Any}          [context]  - scope of error
+     * @returns {Promise} of handled error.
+     */
+    handleException(exception, context) {},
+
+    /**
+     * Reports an error.
+     * @method reportError
+     * @param   {Any}          error      - error (usually Error)
+     * @param   {Any}          [context]  - scope of error
+     * @returns {Promise} of reported error.
+     */
+    reportError(error, context) {},
+
+    /**
+     * Reports an excepion.
+     * @method reportException
+     * @param   {Exception}    exception  - exception
+     * @param   {Any}          [context]  - scope of exception
+     * @returns {Promise} of reported exception.
+     */
+    reportException(exception, context) {},
+
+    /**
+     * Clears any errors for the associated context.
+     * @method clearErrors
+     * @param   {Any}          [context]  - scope of errors
+     */
+    clearErrors(context) {}
+
+  });
+  /**
+   * Error handler.
+   * @class ErrorHandler
+   * @extends Handler
+   * @uses Errors
+   */
+
+  var ErrorHandler = (_dec$b = conformsTo(Errors), _dec2$2 = provides(), _dec3$1 = singleton(), _dec$b(_class$d = _dec2$2(_class$d = _dec3$1(_class$d = class ErrorHandler extends Handler {
+    handleError(error, context) {
+      var result = Errors(exports.$composer).reportError(error, context);
+      return result === undefined ? Promise.reject(error) : Promise.resolve(result);
+    }
+
+    handleException(exception, context) {
+      var result = Errors(exports.$composer).reportException(exception, context);
+      return result === undefined ? Promise.reject(exception) : Promise.resolve(result);
+    }
+
+    reportError(error, context) {
+      console.error(error);
+      return Promise.resolve();
+    }
+
+    reportException(exception, context) {
+      console.error(exception);
+      return Promise.resolve();
+    }
+
+    clearErrors(context) {}
+
+  }) || _class$d) || _class$d) || _class$d);
+  Handler.implement({
+    /**
+     * Marks the handler for recovery.
+     * @method $recover
+     * @returns {HandlerFilter} recovery semantics.
+     * @for Handler
+     */
+    $recover(context) {
+      return this.$filter((callback, composer, proceed) => {
+        try {
+          var handled = proceed();
+
+          if (!("callbackResult" in callback)) {
+            return handled;
+          }
+
+          if (handled) {
+            var result = callback.callbackResult;
+
+            if ($isPromise(result)) {
+              callback.callbackResult = result.catch(err => Errors(composer).handleError(err, context));
+            }
+          }
+
+          return handled;
+        } catch (ex) {
+          Errors(composer).handleException(ex, context);
+          return true;
+        }
+      });
+    },
+
+    /**
+     * Creates a function to pass error promises to Errors feature.
+     * @method $recoverError
+     * @returns {Function} function to pass error promises to Errors feature. 
+     * @for Handler
+     */
+    $recoverError(context) {
+      return error => Errors(this).handleError(error, context);
+    }
+
+  });
 
   var mappingMetadataKey = Symbol("mapping-metadata");
   /**
@@ -6089,7 +6396,7 @@
           id = id.replace(/\s+/g, '');
         }
 
-        idToType.set(id, new WeakRef(target));
+        idToType.set(id, target);
         typeToId.set(target, id);
       } else {
         var getter;
@@ -6155,13 +6462,10 @@
     }
 
     var stripped = id.replace(/\s+/g, ''),
-        weakType = idToType.get(stripped);
-
-    if (!$isNothing(weakType)) {
-      var type = weakType.deref();
-      if (!$isNothing(type)) return type;
-      idToType.delete(stripped);
-    }
+        type = idToType.get(stripped);
+    
+    if (!$isNothing(type)) return type;
+    idToType.delete(stripped);
   };
   /**
    * Maintains type information for a class.
@@ -6182,1251 +6486,12 @@
     typeInfo.getOrCreateOwn(target, () => ({})).typeIdProperty = typeIdProperty;
   });
 
-  var _$i = createKeyChain();
-  /**
-   * CallbackOptions flags enum
-   * @class CallbackOptions
-   * @extends Flags
-   */
-
-
-  var CallbackOptions = Flags({
-    /**
-     * @property {number} None
-     */
-    None: 0,
-
-    /**
-     * Requires no protocol conformance.
-     * @property {number} Duck
-     */
-    Duck: 1 << 0,
-
-    /**
-     * Requires callback to match exact protocol.
-     * @property {number} Strict
-     */
-    Strict: 1 << 1,
-
-    /**
-     * Delivers callback to all handlers.  At least one must recognize it.
-     * @property {number} Broadcast
-     */
-    Broadcast: 1 << 2,
-
-    /**
-     * Marks callback as optional.
-     * @property {number} BestEffort
-     */
-    BestEffort: 1 << 3,
-
-    /**
-     * Publishes callback to all handlers.
-     * @property {number} Notify
-     */
-    Notify: 1 << 2 | 1 << 3
-  });
-  /**
-   * Captures callback semantics.
-   * @class CallbackSemantics
-   * @constructor
-   * @param  {CallbackOptions}  options  -  callback options.
-   * @extends Composition
-   */
-
-  class CallbackSemantics extends Composition {
-    constructor(options) {
-      super();
-
-      var _this = _$i(this);
-
-      _this.options = CallbackOptions.None.addFlag(options);
-      _this.specified = _this.options;
-    }
-
-    get canBatch() {
-      return false;
-    }
-
-    get canFilter() {
-      return false;
-    }
-
-    get canInfer() {
-      return false;
-    }
-
-    hasOption(options) {
-      return _$i(this).options.hasFlag(options);
-    }
-
-    setOption(options, enabled) {
-      var _this = _$i(this);
-
-      _this.options = enabled ? _this.options.addFlag(options) : _this.options.removeFlag(options);
-      _this.specified = _this.specified.addFlag(options);
-    }
-
-    isSpecified(options) {
-      return _$i(this).specified.hasFlag(options);
-    }
-
-    mergeInto(semantics) {
-      var items = CallbackOptions.items;
-
-      for (var i = 0; i < items.length; ++i) {
-        var option = +items[i];
-
-        if (this.isSpecified(option) && !semantics.isSpecified(option)) {
-          semantics.setOption(option, this.hasOption(option));
-        }
-      }
-    }
-
-  }
-  Handler.implement({
-    /**
-     * Establishes duck callback semantics.
-     * @method $duck
-     * @returns {Handler} duck semantics.
-     * @for Handler
-     */
-    $duck() {
-      return this.$callOptions(CallbackOptions.Duck);
-    },
-
-    /**
-     * Establishes strict callback semantics.
-     * @method $strict
-     * @returns {Handler} strict semantics.
-     * @for Handler
-     */
-    $strict() {
-      return this.$callOptions(CallbackOptions.Strict);
-    },
-
-    /**
-     * Establishes broadcast callback semantics.
-     * @method $broadcast
-     * @returns {Handler} broadcast semanics.
-     * @for Handler
-     */
-    $broadcast() {
-      return this.$callOptions(CallbackOptions.Broadcast);
-    },
-
-    /**
-     * Establishes best-effort callback semantics.
-     * @method $bestEffort
-     * @returns {Handler} best-effort semanics.
-     * @for Handler
-     */
-    $bestEffort() {
-      return this.$callOptions(CallbackOptions.BestEffort);
-    },
-
-    /**
-     * Establishes notification callback semantics.
-     * @method $notify
-     * @returns {CallbackOptionsHandler} notification semanics.
-     * @for Handler
-     */
-    $notify() {
-      return this.$callOptions(CallbackOptions.Notify);
-    },
-
-    /**
-     * Establishes callback semantics.
-     * @method $callOptions
-     * @param  {CallbackOptions}  options  -  callback semantics
-     * @returns {Handler} custom callback semanics.
-     * @for Handler
-     */
-    $callOptions(options) {
-      var semantics = new CallbackSemantics(options);
-      return this.decorate({
-        handleCallback(callback, greedy, composer) {
-          if (Composition.isComposed(callback, CallbackSemantics)) {
-            return false;
-          }
-
-          if (callback instanceof CallbackSemantics) {
-            semantics.mergeInto(callback);
-
-            if (greedy) {
-              this.base(callback, greedy, composer);
-            }
-
-            return true;
-          } else if (callback instanceof Composition) {
-            return this.base(callback, greedy, composer);
-          }
-
-          if (semantics.isSpecified(CallbackOptions.Broadcast)) {
-            greedy = semantics.hasOption(CallbackOptions.Broadcast);
-          }
-
-          if (semantics.isSpecified(CallbackOptions.BestEffort) && semantics.hasOption(CallbackOptions.BestEffort)) {
-            try {
-              this.base(callback, greedy, composer);
-              return true;
-            } catch (exception) {
-              if (exception instanceof NotHandledError || exception instanceof RejectedError) {
-                return true;
-              }
-
-              throw exception;
-            }
-          }
-
-          return this.base(callback, greedy, composer);
-        }
-
-      });
-    }
-
-  });
-
-  var _class$d;
-  /**
-   * Represents a two-way
-   * {{#crossLink "Handler"}}{{/crossLink}} path.
-   * @class CascadeHandler
-   * @constructor
-   * @param  {Handler}  handler           -  primary handler
-   * @param  {Handler}  cascadeToHandler  -  secondary handler
-   * @extends Handler
-   */
-
-  var CascadeHandler = unmanaged(_class$d = class CascadeHandler extends Handler {
-    constructor(handler, cascadeToHandler) {
-      if ($isNothing(handler)) {
-        throw new TypeError("No handler specified.");
-      } else if ($isNothing(cascadeToHandler)) {
-        throw new TypeError("No cascadeToHandler specified.");
-      }
-
-      super();
-      Object.defineProperties(this, {
-        handler: {
-          value: Handler.for(handler),
-          writable: false
-        },
-        cascadeToHandler: {
-          value: Handler.for(cascadeToHandler),
-          writable: false
-        }
-      });
-    }
-
-    handleCallback(callback, greedy, composer) {
-      var handled = super.handleCallback(callback, greedy, composer);
-      return !!(greedy ? handled | (this.handler.handle(callback, true, composer) | this.cascadeToHandler.handle(callback, true, composer)) : handled || this.handler.handle(callback, false, composer) || this.cascadeToHandler.handle(callback, false, composer));
-    }
-
-  }) || _class$d;
-
-  var _$j = createKeyChain();
-
-  class Resolving extends Inquiry {
-    constructor(key, callback) {
-      if ($isNothing(callback)) {
-        throw new Error("The callback argument is required.");
-      }
-
-      if (callback instanceof Inquiry) {
-        super(key, true, callback);
-      } else {
-        super(key, true);
-      }
-
-      _$j(this).callback = callback;
-    }
-
-    get callback() {
-      return _$j(this).callback;
-    }
-
-    get succeeded() {
-      return _$j(this).succeeded;
-    }
-
-    guardDispatch(handler, binding) {
-      var outer = super.guardDispatch(handler, binding);
-
-      if (outer) {
-        var callback = _$j(this).callback,
-            guardDispatch = callback.guardDispatch;
-
-        if ($isFunction(guardDispatch)) {
-          var inner = guardDispatch.call(callback, handler, binding);
-
-          if (!inner) {
-            if ($isFunction(outer)) {
-              outer.call(this);
-            }
-
-            return inner;
-          }
-
-          if ($isFunction(inner)) {
-            if ($isFunction(outer)) {
-              return function () {
-                inner.call(callback);
-                outer.call(this);
-              };
-            }
-
-            return inner;
-          }
-        }
-      }
-
-      return outer;
-    }
-
-    isSatisfied(resolution, greedy, composer) {
-      if (_$j(this).succeeded && !greedy) return true;
-      var callback = this.callback,
-          handled = CallbackPolicy.dispatch(resolution, callback, greedy, composer);
-
-      if (handled) {
-        _$j(this).succeeded = true;
-      }
-
-      return handled;
-    }
-
-    toString() {
-      return `Resolving | ${this.key} => ${this.callback}`;
-    }
-
-  }
-
-  var _dec$b, _class$e;
-
-  var _$k = createKeyChain(),
-      defaultKeyResolver$1 = new KeyResolver(),
-      globalFilters = new FilteredScope();
-  /**
-   * Invokes a method on a target.
-   * @class HandleMethod
-   * @constructor
-   * @param  {number}              methodType  -  get, set or invoke
-   * @param  {Protocol}            protocol    -  initiating protocol
-   * @param  {string}              methodName  -  method name
-   * @param  {Any}                 args        -  method or property arguments
-   * @param  {InvocationSemanics}  semantics   -  invocation semantics
-   * @extends Base
-   */
-
-
-  var HandleMethod = (_dec$b = conformsTo(CallbackControl), _dec$b(_class$e = class HandleMethod extends exports.Base {
-    constructor(methodType, protocol, methodName, args, semantics) {
-      if ($isNothing(methodName)) {
-        throw new Error("The methodName argument is required");
-      }
-
-      if (protocol && !$isProtocol(protocol)) {
-        throw new TypeError("Invalid protocol supplied.");
-      }
-
-      super();
-
-      var _this = _$k(this);
-
-      _this.methodType = methodType;
-      _this.protocol = protocol;
-      _this.methodName = methodName;
-      _this.args = args;
-      _this.semantics = semantics || new CallbackSemantics();
-    }
-
-    get methodType() {
-      return _$k(this).methodType;
-    }
-
-    get protocol() {
-      return _$k(this).protocol;
-    }
-
-    get semantics() {
-      return _$k(this).semantics;
-    }
-
-    get methodName() {
-      return _$k(this).methodName;
-    }
-
-    get args() {
-      return _$k(this).args;
-    }
-
-    set args(value) {
-      _$k(this).args = value;
-    }
-
-    get returnValue() {
-      return _$k(this).returnValue;
-    }
-
-    set returnValue(value) {
-      _$k(this).returnValue = value;
-    }
-
-    get exception() {
-      return _$k(this).exception;
-    }
-
-    set exception(exception) {
-      _$k(this).exception = exception;
-    }
-
-    get callbackResult() {
-      return _$k(this).returnValue;
-    }
-
-    set callbackResult(value) {
-      _$k(this).returnValue = value;
-    }
-
-    inferCallback() {
-      return new HandleMethodInference(this);
-    }
-    /**
-     * Attempts to invoke the method on the target.<br/>
-     * During invocation, the receiver will have access to the ambient **$composer** property
-     * representing the initiating {{#crossLink "Handler"}}{{/crossLink}}.
-     * @method invokeOn
-     * @param   {Object}   target    -  method receiver
-     * @param   {Handler}  composer  -  composition handler
-     * @returns {boolean} true if the method was accepted.
-     */
-
-
-    invokeOn(target, composer) {
-      if (!this.isAcceptableTarget(target)) return false;
-      var method;
-      var {
-        methodName,
-        methodType,
-        args
-      } = this;
-
-      if (methodType === MethodType.Invoke) {
-        method = target[methodName];
-        if (!$isFunction(method)) return false;
-      }
-
-      var filters, binding;
-
-      if (!$isNothing(composer)) {
-        var owner = HandlerDescriptor.get(target, true);
-        binding = Binding.create(HandleMethod, target, null, methodName);
-        filters = composer.$getOrderedFilters(binding, this, [binding.getMetadata(filter), owner, HandleMethod.globalFilters]);
-        if ($isNothing(filters)) return false;
-      }
-
-      var action,
-          completed = true;
-
-      try {
-        switch (methodType) {
-          case MethodType.Get:
-            action = composer != null ? () => composer.$compose(() => target[methodName]) : () => target[methodName];
-            break;
-
-          case MethodType.Set:
-            action = composer != null ? () => composer.$compose(() => target[methodName] = args) : () => target[methodName] = args;
-            break;
-
-          case MethodType.Invoke:
-            action = composer != null ? () => composer.$compose(() => method.apply(target, args)) : () => method.apply(target, args);
-            break;
-        }
-
-        var result = $isNothing(filters) || filters.length == 0 ? action() : filters.reduceRight((next, pipeline) => (comp, proceed) => {
-          if (proceed) {
-            var _filter = pipeline.filter,
-                signature = design.get(_filter, "next"),
-                _args = resolveArgs$1.call(this, signature, comp);
-
-            if (!$isNothing(_args)) {
-              var provider = pipeline.provider,
-                  context = {
-                binding,
-                rawCallback: this,
-                provider,
-                composer: comp,
-                next: (c, p) => next(c != null ? c : comp, p != null ? p : true),
-                abort: () => next(null, false)
-              };
-              return $isPromise(_args) ? _args.then(a => _filter.next(...a, context)) : _filter.next(..._args, context);
-            }
-          }
-
-          completed = false;
-        }, (comp, proceed) => {
-          if (proceed) return action();
-          completed = false;
-        })(composer, true);
-
-        if (!completed || result === $unhandled) {
-          return false;
-        }
-
-        _$k(this).returnValue = result;
-        return true;
-      } catch (exception) {
-        _$k(this).exception = exception;
-        throw exception;
-      }
-    }
-
-    isAcceptableTarget(target) {
-      if ($isNothing(target)) return false;
-      if ($isNothing(this.protocol)) return true;
-      return this.semantics.hasOption(CallbackOptions.Strict) ? this.protocol.isToplevel(target) : this.semantics.hasOption(CallbackOptions.Duck) || this.protocol.isAdoptedBy(target);
-    }
-
-    notHandledError() {
-      var qualifier = "";
-
-      switch (this.methodType) {
-        case MethodType.Get:
-          qualifier = " (get)";
-          break;
-
-        case MethodType.Set:
-          qualifier = " (set)";
-          break;
-      }
-
-      return new TypeError(`Protocol ${this.protocol.name}:${this.methodName}${qualifier} could not be handled.`);
-    }
-
-    dispatch(handler, greedy, composer) {
-      return this.invokeOn(handler, composer);
-    }
-
-    toString() {
-      return `HandleMethod | ${this.methodName}`;
-    }
-
-    static get globalFilters() {
-      return globalFilters;
-    }
-
-  }) || _class$e);
-
-  class HandleMethodInference extends Trampoline {
-    constructor(handleMethod) {
-      super(handleMethod);
-      _$k(this).resolving = new Resolving(handleMethod.protocol, handleMethod);
-    }
-
-    get callbackResult() {
-      var result = _$k(this).resolving.callbackResult;
-
-      if ($isPromise(result)) {
-        return result.then(() => {
-          if (_$k(this).resolving.succeeded) {
-            return this.callback.callbackResult;
-          }
-
-          throw new NotHandledError(this.callback);
-        });
-      }
-
-      return this.callback.callbackResult;
-    }
-
-    set callbackResult(value) {
-      super.callbackResult = value;
-    }
-
-    dispatch(handler, greedy, composer) {
-      return super.dispatch(handler, greedy, composer) || _$k(this).resolving.dispatch(handler, greedy, composer);
-    }
-
-  }
-
-  function resolveArgs$1(signature, composer) {
-    var _this2 = this;
-
-    if ($isNothing(signature)) {
-      return [this];
-    }
-
-    var {
-      args
-    } = signature;
-
-    if ($isNothing(args) || args.length === 0) {
-      return [this];
-    }
-
-    var resolved = [],
-        promises = [];
-
-    var _loop = function (i) {
-      var arg = args[i];
-
-      if ($isNothing(arg)) {
-        if (i === 0) {
-          resolved[0] = _this2;
-        }
-
-        return "continue";
-      }
-
-      if (i === 0 && $isNothing(arg.keyResolver)) {
-        if (arg.validate(_this2)) {
-          resolved[0] = _this2;
-          return "continue";
-        }
-      }
-
-      var resolver = arg.keyResolver || defaultKeyResolver$1,
-          validate = resolver.validate;
-
-      if ($isFunction(validate)) {
-        validate.call(resolver, arg);
-      }
-
-      var dep = resolver.resolve(arg, composer);
-      if ($isNothing(dep)) return {
-        v: null
-      };
-
-      if ($optional.test(dep)) {
-        resolved[i] = $contents(dep);
-      } else if ($isPromise(dep)) {
-        promises.push(dep.then(result => resolved[i] = result));
-      } else {
-        resolved[i] = dep;
-      }
-    };
-
-    for (var i = 0; i < args.length; ++i) {
-      var _ret = _loop(i);
-
-      if (_ret === "continue") continue;
-      if (typeof _ret === "object") return _ret.v;
-    }
-
-    if (promises.length === 0) {
-      return resolved;
-    }
-
-    if (promises.length === 1) {
-      return promises[0].then(() => resolved);
-    }
-
-    return Promise.all(promises).then(() => resolved);
-  }
-
-  var _dec$c, _class$f;
-
-  var _$l = createKeyChain();
-  /**
-   * Callback representing the covariant creation of a type.
-   * @class Creation
-   * @constructor
-   * @param   {Object}   callback  -  callback
-   * @param   {boolean}  many      -  creation cardinality
-   * @extends Base
-   */
-
-
-  var Creation = (_dec$c = conformsTo(CallbackControl), _dec$c(_class$f = class Creation extends exports.Base {
-    constructor(type, many) {
-      if ($isNothing(type)) {
-        throw new TypeError("The type argument is required.");
-      }
-
-      super();
-
-      var _this = _$l(this);
-
-      _this.type = type;
-      _this.many = !!many;
-      _this.instances = [];
-      _this.promises = [];
-    }
-
-    get isMany() {
-      return _$l(this).many;
-    }
-
-    get type() {
-      return _$l(this).type;
-    }
-
-    get instances() {
-      return _$l(this).instances;
-    }
-
-    get callbackPolicy() {
-      return creates.policy;
-    }
-
-    get callbackResult() {
-      var {
-        result,
-        instances,
-        promises
-      } = _$l(this);
-
-      if (result === undefined) {
-        if (promises.length == 0) {
-          _$l(this).result = result = this.isMany ? instances : instances[0];
-        } else {
-          _$l(this).result = result = this.isMany ? Promise.all(promises).then(() => instances) : Promise.all(promises).then(() => instances[0]);
-        }
-      }
-
-      return result;
-    }
-
-    set callbackResult(value) {
-      _$l(this).result = value;
-    }
-
-    addInstance(instance) {
-      if ($isNothing(instance)) return;
-
-      if ($isPromise(instance)) {
-        _$l(this).promises.push(instance.then(res => {
-          if (res != null) {
-            _$l(this).instances.push(res);
-          }
-        }));
-      } else {
-        _$l(this).instances.push(instance);
-      }
-
-      delete _$l(this).result;
-    }
-
-    dispatch(handler, greedy, composer) {
-      var count = _$l(this).instances.length;
-
-      return creates.dispatch(handler, this, this, this.type, composer, this.isMany, this.addInstance.bind(this)) || _$l(this).instances.length > count;
-    }
-
-    toString() {
-      return `Creation ${this.isMany ? "many " : ""}| ${this.type}`;
-    }
-
-  }) || _class$f);
-
-  Handler.implement({
-    /**
-     * Prepares the Handler for batching.
-     * @method $batch
-     * @param   {Any}  [...tags]  -  tags to batch
-     * @returns {Handler}  batching callback handler.
-     * @for Handler
-     */
-    $batch(...args) {
-      var _dec, _obj;
-
-      args = $flatten(args);
-
-      if (args.length === 0) {
-        throw new Error("Missing $batch block function.");
-      }
-
-      var block = args.pop();
-
-      if (!$isFunction(block)) {
-        throw new TypeError("The $batch block must be a function.");
-      }
-
-      var _batch = new Batch(...args),
-          _complete = false;
-
-      var batcher = this.decorate((_dec = provides(Batching), (_obj = {
-        getBatcher(inquiry) {
-          if (!$isNothing(_batch)) {
-            var _batcher = _batch.resolve(inquiry.key);
-
-            if ($isNothing(_batcher)) {
-              _batcher = Reflect.construct(inquiry.key, []);
-
-              _batch.addHandlers(_batcher);
-            }
-
-            return _batcher;
-          }
-        },
-
-        handleCallback(callback, greedy, composer) {
-          if (_batch && callback.canBatch !== false) {
-            var b = _batch;
-
-            if (_complete && !(callback instanceof Composition)) {
-              _batch = null;
-            }
-
-            if (b.handle(callback, greedy, composer)) {
-              return true;
-            }
-          }
-
-          return this.base(callback, greedy, composer);
-        }
-
-      }, (_applyDecoratedDescriptor(_obj, "getBatcher", [_dec], Object.getOwnPropertyDescriptor(_obj, "getBatcher"), _obj)), _obj)));
-      var promise = block(batcher);
-      _complete = true;
-      var results = BatchingComplete(batcher).complete(batcher);
-
-      if ($isPromise(promise)) {
-        return $isPromise(results) ? results.then(res => promise.then(() => res)) : promise.then(() => results);
-      }
-
-      return results;
-    },
-
-    $noBatch() {
-      return this.decorate({
-        handleCallback(callback, greedy, composer) {
-          var _inquiry;
-
-          var inquiry;
-
-          if (callback instanceof Inquiry) {
-            inquiry = callback;
-          } else if (Composition.isComposed(callback, Inquiry)) {
-            inquiry = callback.callback;
-          }
-
-          return ((_inquiry = inquiry) == null ? void 0 : _inquiry.key) !== Batch && this.base(new NoBatch(callback), greedy, composer);
-        }
-
-      });
-    },
-
-    $getBatch(tag) {
-      var batch = this.resolve(Batch);
-
-      if (!$isNothing(batch) && ($isNothing(tag) || batch.shouldBatch(tag))) {
-        return batch;
-      }
-    },
-
-    $getBatcher(batcherType, tag) {
-      if (!Batching.isAdoptedBy(batcherType)) {
-        throw new TypeError(`Batcher ${batcherType.name} does not conform to Batching protocol.`);
-      }
-
-      var batch = this.resolve(Batch);
-      if ($isNothing(batch)) return;
-      var batcher = batch.resolve(batcherType);
-
-      if ($isNothing(batcher)) {
-        batcher = Reflect.construct(batcherType, []);
-        batch.addHandlers(batcher);
-      }
-
-      return batcher;
-    }
-
-  });
-
-  var HandleResult = Enum(HandleResult => ({
-    Handled: HandleResult(true, false),
-    HandledAndStop: HandleResult(true, true),
-    NotHandled: HandleResult(false, false),
-    NotHandledAndStop: HandleResult(false, true)
-  }), {
-    constructor(handled, stop) {
-      this.extend({
-        get handled() {
-          return handled;
-        },
-
-        get stop() {
-          return stop;
-        }
-
-      });
-    },
-
-    next(condition, block) {
-      var stop = this.stop;
-
-      if (block == null) {
-        block = condition;
-      } else {
-        stop = stop || !condition;
-      }
-
-      return stop || !$isFunction(block) ? this : mapResult(block, this);
-    },
-
-    success(block) {
-      if (this.handled && $isFunction(block)) {
-        return block.call(this);
-      }
-    },
-
-    failure(block) {
-      if (!this.handled && $isFunction(block)) {
-        return block.call(this);
-      }
-    },
-
-    otherwise(condition, block) {
-      if ($isFunction(block)) {
-        return (this.handled || this.stop) && !condition ? this : mapResult(block, this);
-      } else if ($isFunction(condition)) {
-        return this.handled || this.stop ? this : mapResult(condition, this);
-      } else if (condition || this.handled) {
-        return this.stop ? HandleResult.HandledAndStop : HandleResult.Handled;
-      } else {
-        return this.stop ? HandleResult.NotHandledAndStop : HandleResult.NotHandled;
-      }
-    },
-
-    or(other) {
-      if (!(other instanceof HandleResult)) {
-        return this;
-      } else if (this.handled || other.handled) {
-        return this.stop || other.stop ? HandleResult.HandledAndStop : HandleResult.Handled;
-      } else {
-        return this.stop || other.stop ? HandleResult.NotHandledAndStop : HandleResult.NotHandled;
-      }
-    },
-
-    and(other) {
-      if (!(other instanceof HandleResult)) {
-        return this;
-      } else if (this.handled && other.handled) {
-        return this.stop || other.stop ? HandleResult.HandledAndStop : HandleResult.Handled;
-      } else {
-        return this.stop || other.stop ? HandleResult.NotHandledAndStop : HandleResult.NotHandled;
-      }
-    },
-
-    toString() {
-      return `HandleResult | ${this.handled ? "handled" : "not handled"} ${this.stop ? " and stop" : ""}`;
-    }
-
-  });
-
-  function mapResult(block, handleResult) {
-    var result = block.call(handleResult);
-    return result instanceof HandleResult ? result : result ? HandleResult.Handled : HandleResult.NotHandled;
-  }
-
-  class InferenceHandler extends Handler {
-    constructor(...types) {
-      super();
-      var owners = new Set(),
-          inferDescriptor = HandlerDescriptor.get(this, true);
-
-      for (var type of types.flat()) {
-        addStaticBindings(type, inferDescriptor);
-        addInstanceBindings(type, inferDescriptor, owners);
-      }
-    }
-
-  }
-
-  function addStaticBindings(type, inferDescriptor) {
-    var typeDescriptor = HandlerDescriptor.get(type);
-
-    if (!$isNothing(typeDescriptor)) {
-      for (var [policy, bindings] of typeDescriptor.bindings) {
-        for (var binding of bindings) {
-          var typeBinding = pcopy(binding);
-          typeBinding.handler = binding.handler.bind(type);
-          inferDescriptor.addBinding(policy, typeBinding);
-        }
-      }
-    }
-  }
-
-  function addInstanceBindings(type, inferDescriptor, owners) {
-    var prototype = type.prototype;
-    if ($isNothing(prototype) || owners.has(prototype)) return;
-
-    function inferShim(...args) {
-      return infer.call(this, type, ...args);
-    }
-
-    for (var descriptor of HandlerDescriptor.getChain(prototype)) {
-      if (!owners.add(descriptor.owner)) break;
-
-      for (var [policy, bindings] of descriptor.bindings) {
-        for (var binding of bindings) {
-          var instanceBinding = pcopy(binding);
-          instanceBinding.handler = inferShim;
-          instanceBinding.getMetadata = Undefined$1;
-          instanceBinding.getParentMetadata = Undefined$1;
-          instanceBinding.skipFilters = true;
-          inferDescriptor.addBinding(policy, instanceBinding);
-        }
-      }
-    }
-  }
-
-  function infer(type, callback, {
-    rawCallback,
-    composer,
-    results
-  }) {
-    if (rawCallback.canInfer === false) {
-      return $unhandled;
-    }
-
-    var resolving = new Resolving(type, rawCallback);
-
-    if (!composer.handle(resolving, false, composer)) {
-      return $unhandled;
-    }
-
-    if (results) {
-      var result = resolving.callbackResult;
-
-      if ($isPromise(result)) {
-        results(result.then(() => {
-          if (!resolving.succeeded) {
-            throw new NotHandledError(callback);
-          }
-        }));
-      }
-    }
-  }
-
-  var _dec$d, _class$g, _dec2$1, _class2$1;
-
-  var _$m = createKey();
-
-  var Lifestyle = (_dec$d = conformsTo(Filtering), _dec$d(_class$g = class Lifestyle {
-    constructor() {
-      if (new.target === Lifestyle) {
-        throw new TypeError("Lifestyle cannot be instantiated.");
-      }
-    }
-
-    get order() {
-      return Number.MAX_SAFE_INTEGER - 1000;
-    }
-
-    next(callback, context) {
-      var parent = callback.parent,
-          isCompatible = this.isCompatibleWithParent;
-
-      if ($isNothing(parent) || !$isFunction(isCompatible) || isCompatible.call(this, parent, context)) {
-        var getInstance = this.getInstance;
-
-        if ($isFunction(getInstance)) {
-          try {
-            var instance = getInstance.call(this, callback, context);
-            if (!$isNothing(instance)) return instance;
-          } catch (ex) {// fall through
-          }
-        } else {
-          return context.next();
-        }
-      }
-
-      return context.abort();
-    }
-
-  }) || _class$g);
-  var LifestyleProvider = (_dec2$1 = conformsTo(FilteringProvider), _dec2$1(_class2$1 = class LifestyleProvider {
-    constructor(lifestyle) {
-      if ($isNothing(lifestyle)) {
-        throw new Error("The lifestyle argument is required.");
-      }
-
-      if (!(lifestyle instanceof Lifestyle)) {
-        throw new TypeError("The lifestyle argument is not a Lifestyle.");
-      }
-
-      _$m(this).lifestyle = [lifestyle];
-    }
-
-    get required() {
-      return true;
-    }
-
-    appliesTo(callback) {
-      return callback instanceof Inquiry;
-    }
-
-    getFilters(binding, callback, composer) {
-      return _$m(this).lifestyle;
-    }
-
-  }) || _class2$1);
-
-  var _$n = createKey();
-
-  class SingletonLifestyle extends Lifestyle {
-    getInstance(inquiry, {
-      next
-    }) {
-      var instance = _$n(this).instance;
-
-      if ($isNothing(instance)) {
-        instance = _$n(this).instance = next();
-
-        if ($isPromise(instance)) {
-          _$n(this).instance = instance = instance.then(result => _$n(this).instance = result).catch(() => _$n(this).instance = null);
-        }
-      }
-
-      return instance;
-    }
-
-  }
-  class SingletonLifestyleProvider extends LifestyleProvider {
-    constructor() {
-      super(new SingletonLifestyle());
-    }
-
-  }
-  var singleton = createFilterDecorator(() => new SingletonLifestyleProvider());
-
-  var _dec$e, _dec2$2, _dec3$1, _class$h;
-  /**
-   * Protocol for handling and reporting errors.
-   * @class Errors
-   * @extends Protocol
-   */
-
-  var Errors = DuckTyping.extend({
-    /**
-     * Handles an error.
-     * @method handlerError
-     * @param   {Any}          error      - error (usually Error)
-     * @param   {Any}          [context]  - scope of error
-     * @returns {Promise} promise of handled error.
-     */
-    handleError(error, context) {},
-
-    /**
-     * Handles an exception.
-     * @method handlerException
-     * @param   {Exception}    excption   - exception
-     * @param   {Any}          [context]  - scope of error
-     * @returns {Promise} of handled error.
-     */
-    handleException(exception, context) {},
-
-    /**
-     * Reports an error.
-     * @method reportError
-     * @param   {Any}          error      - error (usually Error)
-     * @param   {Any}          [context]  - scope of error
-     * @returns {Promise} of reported error.
-     */
-    reportError(error, context) {},
-
-    /**
-     * Reports an excepion.
-     * @method reportException
-     * @param   {Exception}    exception  - exception
-     * @param   {Any}          [context]  - scope of exception
-     * @returns {Promise} of reported exception.
-     */
-    reportException(exception, context) {},
-
-    /**
-     * Clears any errors for the associated context.
-     * @method clearErrors
-     * @param   {Any}          [context]  - scope of errors
-     */
-    clearErrors(context) {}
-
-  });
-  /**
-   * Error handler.
-   * @class ErrorHandler
-   * @extends Handler
-   * @uses Errors
-   */
-
-  var ErrorHandler = (_dec$e = conformsTo(Errors), _dec2$2 = provides(), _dec3$1 = singleton(), _dec$e(_class$h = _dec2$2(_class$h = _dec3$1(_class$h = class ErrorHandler extends Handler {
-    handleError(error, context) {
-      var result = Errors(exports.$composer).reportError(error, context);
-      return result === undefined ? Promise.reject(error) : Promise.resolve(result);
-    }
-
-    handleException(exception, context) {
-      var result = Errors(exports.$composer).reportException(exception, context);
-      return result === undefined ? Promise.reject(exception) : Promise.resolve(result);
-    }
-
-    reportError(error, context) {
-      console.error(error);
-      return Promise.resolve();
-    }
-
-    reportException(exception, context) {
-      console.error(exception);
-      return Promise.resolve();
-    }
-
-    clearErrors(context) {}
-
-  }) || _class$h) || _class$h) || _class$h);
-  Handler.implement({
-    /**
-     * Marks the handler for recovery.
-     * @method $recover
-     * @returns {HandlerFilter} recovery semantics.
-     * @for Handler
-     */
-    $recover(context) {
-      return this.filter((callback, composer, proceed) => {
-        try {
-          var handled = proceed();
-
-          if (!("callbackResult" in callback)) {
-            return handled;
-          }
-
-          if (handled) {
-            var result = callback.callbackResult;
-
-            if ($isPromise(result)) {
-              callback.callbackResult = result.catch(err => Errors(composer).handleError(err, context));
-            }
-          }
-
-          return handled;
-        } catch (ex) {
-          Errors(composer).handleException(ex, context);
-          return true;
-        }
-      });
-    },
-
-    /**
-     * Creates a function to pass error promises to Errors feature.
-     * @method $recoverError
-     * @returns {Function} function to pass error promises to Errors feature. 
-     * @for Handler
-     */
-    $recoverError(context) {
-      return error => Errors(this).handleError(error, context);
-    }
-
-  });
-
-  var _class$i, _temp;
+  var _class$e, _temp;
   var CacheAction = Enum({
     Refresh: 0,
     Invalidate: 1
   });
-  var Cached = (_class$i = (_temp = class Cached extends RequestWrapper {
+  var Cached = (_class$e = (_temp = class Cached extends RequestWrapper {
     constructor(request) {
       super(request);
 
@@ -7443,7 +6508,7 @@
       return `Miruken.Api.Cache.Cached\`1[[${responseTypeId}]], Miruken`;
     }
 
-  }, _temp), (_applyDecoratedDescriptor(_class$i.prototype, "typeId", [typeId], Object.getOwnPropertyDescriptor(_class$i.prototype, "typeId"), _class$i.prototype)), _class$i);
+  }, _temp), (_applyDecoratedDescriptor(_class$e.prototype, "typeId", [typeId], Object.getOwnPropertyDescriptor(_class$e.prototype, "typeId"), _class$e.prototype)), _class$e);
   Request.implement({
     cached(timeToLive) {
       var cached = new Cached(this);
@@ -7465,15 +6530,15 @@
 
   });
 
-  var _dec$f, _dec2$3, _dec3$2, _class$j, _class2$2;
+  var _dec$c, _dec2$3, _dec3$2, _class$f, _class2$2;
 
   var ONE_DAY_MS = 86400000,
-      _$o = createKey();
+      _$k = createKey();
 
-  var CachedHandler = (_dec$f = provides(), _dec2$3 = singleton(), _dec3$2 = handles(Cached), _dec$f(_class$j = _dec2$3(_class$j = (_class2$2 = class CachedHandler extends Handler {
+  var CachedHandler = (_dec$c = provides(), _dec2$3 = singleton(), _dec3$2 = handles(Cached), _dec$c(_class$f = _dec2$3(_class$f = (_class2$2 = class CachedHandler extends Handler {
     constructor() {
       super();
-      _$o(this).cache = new Map();
+      _$k(this).cache = new Map();
     }
 
     cached(cached, {
@@ -7487,10 +6552,10 @@
       var cacheKey = createCacheKey(request);
 
       if ($isNothing(cacheKey)) {
-        return composer.send(request);
+        return composer.$send(request);
       }
 
-      var cache = _$o(this).cache,
+      var cache = _$k(this).cache,
           entry = cache == null ? void 0 : cache.get(cacheKey);
 
       if (action === CacheAction.Refresh || action === CacheAction.Invalidate) {
@@ -7514,10 +6579,10 @@
       return entry.response;
     }
 
-  }, (_applyDecoratedDescriptor(_class2$2.prototype, "cached", [_dec3$2], Object.getOwnPropertyDescriptor(_class2$2.prototype, "cached"), _class2$2.prototype)), _class2$2)) || _class$j) || _class$j);
+  }, (_applyDecoratedDescriptor(_class2$2.prototype, "cached", [_dec3$2], Object.getOwnPropertyDescriptor(_class2$2.prototype, "cached"), _class2$2.prototype)), _class2$2)) || _class$f) || _class$f);
 
   function refreshResponse(cache, cacheKey, request, composer) {
-    var response = composer.send(request);
+    var response = composer.$send(request);
     if ($isNothing(response)) return;
     var entry = {
       response: response,
@@ -7544,17 +6609,17 @@
     }
   }
 
-  var _$p = createKey();
+  var _$l = createKey();
 
   var left = (Base, constraint, required) => class Left extends Base {
     constructor(value) {
       super();
       validate(value, constraint, required);
-      _$p(this).value = value;
+      _$l(this).value = value;
     }
 
     get value() {
-      return _$p(this).value;
+      return _$l(this).value;
     }
 
     map(func) {
@@ -7578,7 +6643,7 @@
         throw new Error("The func argument is not a function.");
       }
 
-      return new Left(func(_$p(this).value));
+      return new Left(func(_$l(this).value));
     }
 
     fold(left, right) {
@@ -7590,7 +6655,7 @@
         throw new Error("The left argument is not a function.");
       }
 
-      return left(_$p(this).value);
+      return left(_$l(this).value);
     }
 
   };
@@ -7598,21 +6663,21 @@
     constructor(value) {
       super();
       validate(value, constraint, required);
-      _$p(this).value = value;
+      _$l(this).value = value;
     }
 
     get value() {
-      return _$p(this).value;
+      return _$l(this).value;
     }
 
     map(func) {
-      return new Right(func(_$p(this).value));
+      return new Right(func(_$l(this).value));
     }
 
     apply(other) {
       var {
         value
-      } = _$p(this);
+      } = _$l(this);
 
       if (!$isFunction(value)) {
         throw new Error("Function containers can only call apply.");
@@ -7630,7 +6695,7 @@
         throw new Error("The func argument is not a function.");
       }
 
-      return func(_$p(this).value);
+      return func(_$l(this).value);
     }
 
     mapLeft(func) {
@@ -7646,7 +6711,7 @@
         throw new Error("The right argument is not a function.");
       }
 
-      return right(_$p(this).value);
+      return right(_$l(this).value);
     }
 
   };
@@ -7710,8 +6775,8 @@
 
   _defineProperty(Try, "Success", right(Try));
 
-  var _dec$g, _dec2$4, _class$k, _class2$3, _descriptor, _temp$1, _dec3$3, _class4, _temp2, _dec4, _class6, _dec5, _class7, _dec6, _class8;
-  var ScheduledResult = (_dec$g = typeId("Miruken.Api.Schedule.ScheduledResult, Miruken"), _dec2$4 = design([Try]), _dec$g(_class$k = (_class2$3 = (_temp$1 = class ScheduledResult {
+  var _dec$d, _dec2$4, _class$g, _class2$3, _descriptor, _temp$1, _dec3$3, _class4, _temp2, _dec4, _class6, _dec5, _class7, _dec6, _class8;
+  var ScheduledResult = (_dec$d = typeId("Miruken.Api.Schedule.ScheduledResult, Miruken"), _dec2$4 = design([Try]), _dec$d(_class$g = (_class2$3 = (_temp$1 = class ScheduledResult {
     constructor(responses) {
       _initializerDefineProperty(this, "responses", _descriptor, this);
 
@@ -7723,7 +6788,7 @@
     enumerable: true,
     writable: true,
     initializer: null
-  })), _class2$3)) || _class$k);
+  })), _class2$3)) || _class$g);
   var Scheduled = (_dec3$3 = response(ScheduledResult), _dec3$3(_class4 = (_temp2 = class Scheduled extends Request {
     constructor(requests) {
       super();
@@ -7742,8 +6807,8 @@
   var Sequential = (_dec5 = typeId("Miruken.Api.Schedule.Sequential, Miruken"), _dec5(_class7 = class Sequential extends Scheduled {}) || _class7);
   var Publish = (_dec6 = typeId("Miruken.Api.Schedule.Publish, Miruken"), _dec6(_class8 = class Publish extends MessageWrapper {}) || _class8);
 
-  var _dec$h, _dec2$5, _dec3$4, _dec4$1, _dec5$1, _class$l, _class2$4;
-  var Scheduler = (_dec$h = provides(), _dec2$5 = singleton(), _dec3$4 = handles(Concurrent), _dec4$1 = handles(Sequential), _dec5$1 = handles(Publish), _dec$h(_class$l = _dec2$5(_class$l = (_class2$4 = class Scheduler extends Handler {
+  var _dec$e, _dec2$5, _dec3$4, _dec4$1, _dec5$1, _class$h, _class2$4;
+  var Scheduler = (_dec$e = provides(), _dec2$5 = singleton(), _dec3$4 = handles(Concurrent), _dec4$1 = handles(Sequential), _dec5$1 = handles(Publish), _dec$e(_class$h = _dec2$5(_class$h = (_class2$4 = class Scheduler extends Handler {
     async concurrent(concurrent, {
       composer
     }) {
@@ -7784,14 +6849,14 @@
     publish(publish, {
       composer
     }) {
-      return this.publish(publish.message);
+      return this.$publish(publish.message);
     }
 
-  }, (_applyDecoratedDescriptor(_class2$4.prototype, "concurrent", [_dec3$4], Object.getOwnPropertyDescriptor(_class2$4.prototype, "concurrent"), _class2$4.prototype), _applyDecoratedDescriptor(_class2$4.prototype, "sequential", [_dec4$1], Object.getOwnPropertyDescriptor(_class2$4.prototype, "sequential"), _class2$4.prototype), _applyDecoratedDescriptor(_class2$4.prototype, "publish", [_dec5$1], Object.getOwnPropertyDescriptor(_class2$4.prototype, "publish"), _class2$4.prototype)), _class2$4)) || _class$l) || _class$l);
+  }, (_applyDecoratedDescriptor(_class2$4.prototype, "concurrent", [_dec3$4], Object.getOwnPropertyDescriptor(_class2$4.prototype, "concurrent"), _class2$4.prototype), _applyDecoratedDescriptor(_class2$4.prototype, "sequential", [_dec4$1], Object.getOwnPropertyDescriptor(_class2$4.prototype, "sequential"), _class2$4.prototype), _applyDecoratedDescriptor(_class2$4.prototype, "publish", [_dec5$1], Object.getOwnPropertyDescriptor(_class2$4.prototype, "publish"), _class2$4.prototype)), _class2$4)) || _class$h) || _class$h);
 
   function process(request, composer) {
     try {
-      var result = request instanceof Publish ? composer.publish(request.message) : composer.send(request);
+      var result = request instanceof Publish ? composer.$publish(request.message) : composer.$send(request);
 
       if ($isPromise(result)) {
         return result.then(res => Try.success(res)).catch(reason => Try.failure(reason));
@@ -7803,25 +6868,25 @@
     }
   }
 
-  var _$q = createKey(),
+  var _$m = createKey(),
       defaultDecorators = [singleton];
 
   var standardHandlers = [ErrorHandler, CachedHandler, Scheduler];
   class SourceBuilder extends exports.Base {
     constructor() {
       super();
-      _$q(this).sources = [];
+      _$m(this).sources = [];
       this.types(standardHandlers);
     }
 
     getTypes() {
-      var types = _$q(this).sources.flatMap(getTypes => getTypes());
+      var types = _$m(this).sources.flatMap(getTypes => getTypes());
 
       return [...new Set(types)];
     }
 
     modules(...modules) {
-      var sources = _$q(this).sources;
+      var sources = _$m(this).sources;
 
       modules.flat().forEach(module => {
         if ($isSomething(module)) {
@@ -7835,7 +6900,7 @@
       var managedTypes = types.flat().filter(requiredType);
 
       if (managedTypes.length > 0) {
-        _$q(this).sources.push(() => managedTypes);
+        _$m(this).sources.push(() => managedTypes);
       }
 
       return this;
@@ -7845,24 +6910,24 @@
   class ProvideBuilder extends exports.Base {
     constructor(owner) {
       super();
-      _$q(this).owner = owner;
+      _$m(this).owner = owner;
     }
 
     implicitConstructors(...decorators) {
-      _$q(this).owner.implicitConstructors = true;
-      _$q(this).owner.implicitDecorators = decorators.flat().filter($isSomething);
+      _$m(this).owner.implicitConstructors = true;
+      _$m(this).owner.implicitDecorators = decorators.flat().filter($isSomething);
     }
 
     explicitConstructors() {
-      _$q(this).owner.implicitConstructors = false;
-      delete _$q(this).owner.implicitDecorators;
+      _$m(this).owner.implicitConstructors = false;
+      delete _$m(this).owner.implicitDecorators;
     }
 
   }
   class DeriveTypesBuilder extends exports.Base {
     constructor(owner) {
       super();
-      _$q(this).owner = owner;
+      _$m(this).owner = owner;
     }
 
     deriveTypes(deriveTypes) {
@@ -7874,7 +6939,7 @@
         throw new TypeError("The deriveTypes argument must be a function.");
       }
 
-      _$q(this).owner.deriveTypes = deriveTypes;
+      _$m(this).owner.deriveTypes = deriveTypes;
     }
 
   }
@@ -7882,43 +6947,43 @@
   class TypeDetailsBuilder extends exports.Base {
     constructor(owner) {
       super();
-      _$q(this).owner = owner;
+      _$m(this).owner = owner;
     }
 
     implicitConstructors(...decorators) {
-      new ProvideBuilder(_$q(this).owner).implicitConstructors(...decorators);
-      return new DeriveTypesBuilder(_$q(this).owner);
+      new ProvideBuilder(_$m(this).owner).implicitConstructors(...decorators);
+      return new DeriveTypesBuilder(_$m(this).owner);
     }
 
     explicitConstructors() {
-      new ProvideBuilder(_$q(this).owner).explicitConstructors();
-      return new DeriveTypesBuilder(_$q(this).owner);
+      new ProvideBuilder(_$m(this).owner).explicitConstructors();
+      return new DeriveTypesBuilder(_$m(this).owner);
     }
 
     deriveTypes(deriveTypes) {
-      new DeriveTypesBuilder(_$q(this).owner).deriveTypes(deriveTypes);
-      return new ProvideBuilder(_$q(this).owner);
+      new DeriveTypesBuilder(_$m(this).owner).deriveTypes(deriveTypes);
+      return new ProvideBuilder(_$m(this).owner);
     }
 
   }
 
   class SelectTypesBuilder extends exports.Base {
     get implicitConstructors() {
-      return _$q(this).implicitConstructors;
+      return _$m(this).implicitConstructors;
     }
 
     get implicitDecorators() {
-      return _$q(this).implicitDecorators;
+      return _$m(this).implicitDecorators;
     }
 
     acceptType(type) {
       var _$condition, _ref;
 
-      return ((_$condition = (_ref = _$q(this)).condition) == null ? void 0 : _$condition.call(_ref, type)) === true;
+      return ((_$condition = (_ref = _$m(this)).condition) == null ? void 0 : _$condition.call(_ref, type)) === true;
     }
 
     deriveTypes(type) {
-      var deriveTypes = _$q(this).deriveTypes;
+      var deriveTypes = _$m(this).deriveTypes;
 
       return $isNothing(deriveTypes) ? [type] : deriveTypes(type);
     }
@@ -7932,9 +6997,9 @@
         throw new TypeError("The clazz argument is not a class.");
       }
 
-      _$q(this).condition = type => type.prototype instanceof clazz || type === clazz && includeSelf;
+      _$m(this).condition = type => type.prototype instanceof clazz || type === clazz && includeSelf;
 
-      return new TypeDetailsBuilder(_$q(this));
+      return new TypeDetailsBuilder(_$m(this));
     }
 
     conformTo(protocol) {
@@ -7946,9 +7011,9 @@
         throw new TypeError("The protocol argument is not a Protocol.");
       }
 
-      _$q(this).condition = type => protocol.isAdoptedBy(type);
+      _$m(this).condition = type => protocol.isAdoptedBy(type);
 
-      return new TypeDetailsBuilder(_$q(this));
+      return new TypeDetailsBuilder(_$m(this));
     }
 
     satisfy(predicate) {
@@ -7960,8 +7025,8 @@
         throw new TypeError("The predicate argument must be a function.");
       }
 
-      _$q(this).condition = predicate;
-      return new TypeDetailsBuilder(_$q(this));
+      _$m(this).condition = predicate;
+      return new TypeDetailsBuilder(_$m(this));
     }
 
   }
@@ -7969,7 +7034,7 @@
     constructor() {
       super();
 
-      var _this = _$q(this);
+      var _this = _$m(this);
 
       _this.sources = new SourceBuilder();
       _this.selectors = [];
@@ -7987,7 +7052,7 @@
         throw new Error("The from argument is not a function.");
       }
 
-      from(_$q(this).sources);
+      from(_$m(this).sources);
       return this;
     }
 
@@ -8003,39 +7068,39 @@
       var selector = new SelectTypesBuilder();
       that(selector);
 
-      _$q(this).selectors.push(selector);
+      _$m(this).selectors.push(selector);
 
       return this;
     }
 
     addHandlers(...handlers) {
-      _$q(this).handlers.push(...handlers.flat().filter($isSomething));
+      _$m(this).handlers.push(...handlers.flat().filter($isSomething));
 
       return this;
     }
 
     implicitConstructors(...decorators) {
-      _$q(this).implicitConstructors = true;
-      _$q(this).implicitDecorators = decorators.flat().filter($isSomething);
+      _$m(this).implicitConstructors = true;
+      _$m(this).implicitDecorators = decorators.flat().filter($isSomething);
       return this;
     }
 
     explicitConstructors() {
-      _$q(this).implicitConstructors = false;
-      delete _$q(this).implicitDecorators;
+      _$m(this).implicitConstructors = false;
+      delete _$m(this).implicitDecorators;
       return this;
     }
 
     build() {
-      var selectors = _$q(this).selectors,
-          types = _$q(this).sources.getTypes().flatMap(type => {
+      var selectors = _$m(this).selectors,
+          types = _$m(this).sources.getTypes().flatMap(type => {
         var match = selectors.find(selector => selector.acceptType(type));
 
         if ($isSomething(match)) {
           return match.deriveTypes(type).flatMap(t => {
             if (provides.isDefined(t)) return [t];
 
-            var implicitConstructors = _$q(this).implicitConstructors;
+            var implicitConstructors = _$m(this).implicitConstructors;
 
             if ($isSomething(match.implicitConstructors)) {
               implicitConstructors = match.implicitConstructors;
@@ -8045,7 +7110,7 @@
               var signature = design.get(t, "constructor");
 
               if (t.length === 0 || $isSomething(signature)) {
-                var decorators = match.implicitDecorators || _$q(this).implicitDecorators || defaultDecorators;
+                var decorators = match.implicitDecorators || _$m(this).implicitDecorators || defaultDecorators;
                 return [t, createFactory(t, signature, decorators)];
               }
             }
@@ -8057,7 +7122,7 @@
         return [];
       });
 
-      return this.createHandler(types, _$q(this).handlers);
+      return this.createHandler(types, _$m(this).handlers);
     }
 
     createHandler(selectedTypes, explicitHandlers) {
@@ -8104,1493 +7169,6 @@
 
     return true;
   }
-
-  var _dec$i, _class$m;
-
-  var _$r = createKeyChain();
-  /**
-   * Callback representing the invariant lookup of a key.
-   * @class Lookup
-   * @constructor
-   * @param   {Any}      key   -  lookup key
-   * @param   {boolean}  many  -  lookup cardinality
-   * @extends Base
-   */
-
-
-  var Lookup = (_dec$i = conformsTo(CallbackControl), _dec$i(_class$m = class Lookup extends exports.Base {
-    constructor(key, many) {
-      if ($isNothing(key)) {
-        throw new Error("The key argument is required.");
-      }
-
-      super();
-
-      var _this = _$r(this);
-
-      _this.key = key;
-      _this.many = !!many;
-      _this.results = [];
-      _this.promises = [];
-      _this.instant = $instant.test(key);
-    }
-
-    get key() {
-      return _$r(this).key;
-    }
-
-    get isMany() {
-      return _$r(this).many;
-    }
-
-    get results() {
-      return _$r(this).results;
-    }
-
-    get callbackPolicy() {
-      return lookups.policy;
-    }
-
-    get callbackResult() {
-      if (_$r(this).result === undefined) {
-        var results = this.results,
-            promises = _$r(this).promises;
-
-        if (promises.length == 0) {
-          _$r(this).result = this.isMany ? results : results[0];
-        } else {
-          _$r(this).result = this.isMany ? Promise.all(promises).then(() => results) : Promise.all(promises).then(() => results[0]);
-        }
-      }
-
-      return _$r(this).result;
-    }
-
-    set callbackResult(value) {
-      _$r(this).result = value;
-    }
-
-    addResult(result, composer) {
-      var found;
-      if ($isNothing(result)) return false;
-
-      if (Array.isArray(result)) {
-        found = $flatten(result, true).reduce((s, r) => include$1.call(this, r, composer) || s, false);
-      } else {
-        found = include$1.call(this, result, composer);
-      }
-
-      if (found) {
-        delete _$r(this).result;
-      }
-
-      return found;
-    }
-
-    dispatch(handler, greedy, composer) {
-      var results = this.results,
-          promises = _$r(this).promises,
-          count = results.length + promises.length,
-          found = looksup.dispatch(handler, this, this, this.key, composer, this.isMany, this.addResult.bind(this));
-
-      return found || results.length + promises.length > count;
-    }
-
-    toString() {
-      return `Lookup ${this.isMany ? "many " : ""}| ${this.key}`;
-    }
-
-  }) || _class$m);
-
-  function include$1(result, composer) {
-    if ($isNothing(result)) return false;
-
-    if ($isPromise(result)) {
-      if (_$r(this).instant) return false;
-      var results = this.results;
-
-      _$r(this).promises.push(result.then(res => {
-        if (Array.isArray(res)) {
-          results.push(...res.filter(r => r != null));
-        } else if (res != null) {
-          results.push(res);
-        }
-      }).catch(Undefined$1));
-    } else {
-      _$r(this).results.push(result);
-    }
-
-    return true;
-  }
-
-  /**
-   * Standard filter precedence.
-   * @class Stage
-   * @extends Enum
-   */
-
-  var Stage = Enum({
-    /**
-     * Normal filters
-     * @property {number} Filter
-     */
-    Filter: 0,
-
-    /**
-     * Logging filters
-     * @property {number} Logging
-     */
-    Logging: 10,
-
-    /**
-     * Authorization filters
-     * @property {number} Authorization
-     */
-    Authorization: 30,
-
-    /**
-     * Validation filters
-     * @property {number} Validation
-     */
-    Validation: 50
-  });
-
-  var _dec$j, _class$n, _dec2$6, _class2$5;
-
-  var _$s = createKey();
-
-  var ConstraintFilter = (_dec$j = conformsTo(Filtering), _dec$j(_class$n = class ConstraintFilter {
-    get order() {
-      return Stage.Filter;
-    }
-
-    next(callback, {
-      provider,
-      next,
-      abort
-    }) {
-      if (!(provider instanceof ConstraintProvider)) {
-        return abort();
-      }
-
-      var metadata = callback.metadata;
-      return !(metadata == null || provider.constraint.matches(metadata)) ? abort() : next();
-    }
-
-  }) || _class$n);
-  var constraintFilter = [new ConstraintFilter()];
-  var ConstraintProvider = (_dec2$6 = conformsTo(FilteringProvider), _dec2$6(_class2$5 = class ConstraintProvider {
-    constructor(constraint) {
-      if ($isNothing(constraint)) {
-        throw new Error("The constraint argument is required.");
-      }
-
-      if (!(constraint instanceof BindingConstraint)) {
-        throw new TypeError("The constraint argument is not a BindingConstraint.");
-      }
-
-      _$s(this).constraint = constraint;
-    }
-
-    get required() {
-      return true;
-    }
-
-    get constraint() {
-      return _$s(this).constraint;
-    }
-
-    appliesTo(callback) {
-      return callback.metadata instanceof BindingMetadata;
-    }
-
-    getFilters(binding, callback, composer) {
-      return constraintFilter;
-    }
-
-  }) || _class2$5);
-
-  function createConstraintDecorator(createConstraint) {
-    if (!$isFunction(createConstraint)) {
-      throw new Error("The createConstraint argument must be a function.");
-    }
-
-    return function (target, key, descriptorOrIndex) {
-      if (arguments.length === 0) {
-        // ConstraintBuilder
-        return createConstraint();
-      }
-
-      if (isDescriptor(descriptorOrIndex))
-        /* member */
-        {
-          createConstraintFilter(createConstraint, target, key, descriptorOrIndex, emptyArray);
-        } else if (target != null && (key == null || typeof key == "string") && typeof descriptorOrIndex == "number")
-        /* parameter */
-        {
-          createConstrainedArgument(createConstraint, target, key, descriptorOrIndex, emptyArray);
-        } else {
-        var args = [...arguments];
-        return function (target, key, descriptorOrIndex) {
-          if (arguments.length === 0) {
-            // ConstraintBuilder
-            return createConstraint(...args);
-          }
-
-          if (key == null && descriptorOrIndex == null ||
-          /* class */
-          isDescriptor(descriptorOrIndex))
-            /* member */
-            {
-              createConstraintFilter(createConstraint, target, key, descriptorOrIndex, args);
-            } else if (target != null && (key == null || typeof key == "string") && typeof descriptorOrIndex == "number")
-            /* parameter */
-            {
-              createConstrainedArgument(createConstraint, target, key, descriptorOrIndex, args);
-            } else {
-            throw new SyntaxError("Constraints can be applied to classes, methods and arguments.");
-          }
-        };
-      }
-    };
-  }
-
-  function createConstraintFilter(createConstraint, target, key, descriptor, args) {
-    var decorator = createFilterDecorator((target, key, descriptor) => {
-      var constraint = createConstraint(...args);
-
-      if (!(constraint instanceof BindingConstraint)) {
-        throw new SyntaxError("The createConstraint function did not return a BindingConstraint.");
-      }
-
-      return new ConstraintProvider(constraint);
-    });
-    return descriptor == null
-    /* class */
-    ? decorator(args)(target, key, descriptor) : decorator(target, key, descriptor);
-  }
-
-  function createConstrainedArgument(createConstraint, target, key, parameterIndex, args) {
-    createTypeInfoDecorator((key, typeInfo) => {
-      var constraint = createConstraint(...args);
-
-      if (!(constraint instanceof BindingConstraint)) {
-        throw new SyntaxError("The createConstraint function did not return a BindingConstraint.");
-      }
-
-      typeInfo.addConstraint(constraint);
-    })(target, key, parameterIndex);
-  }
-
-  var constraint = createConstraintDecorator(constraint => constraint);
-
-  var _$t = createKey();
-
-  class NamedConstraint extends BindingConstraint {
-    constructor(name) {
-      super();
-
-      if (!name) {
-        throw new Error("The name cannot be empty.");
-      }
-
-      _$t(this).name = name;
-    }
-
-    get name() {
-      return _$t(this).name;
-    }
-
-    require(metadata) {
-      if ($isNothing(metadata)) {
-        throw new Error("The metadata argument is required.");
-      }
-
-      metadata.name = _$t(this).name;
-    }
-
-    matches(metadata) {
-      if ($isNothing(metadata)) {
-        throw new Error("The metadata argument is required.");
-      }
-
-      var name = metadata.name;
-      return $isNothing(name) || this.name == name;
-    }
-
-  }
-  var named = createConstraintDecorator(name => new NamedConstraint(name));
-
-  var _$u = createKey();
-
-  class ConstraintBuilder {
-    constructor(metadata) {
-      if ($isNothing(metadata)) {
-        metadata = new BindingMetadata();
-      } else if (!(metadata instanceof BindingMetadata)) {
-        if (metadata.metadata instanceof BindingMetadata) {
-          metadata = metadata.metadata;
-        }
-      }
-
-      if ($isNothing(metadata)) {
-        throw new TypeError("The metadata argument must be a BindingMetadata or BindingSource.");
-      }
-
-      _$u(this).metadata = metadata;
-    }
-
-    named(name) {
-      return this.require(new NamedConstraint(name));
-    }
-
-    require(...args) {
-      var metadata = _$u(this).metadata;
-
-      if (args.length === 2 && $isString$1(args[0])) {
-        metadata.set(args[0], args[1]);
-        return this;
-      }
-
-      if (args.length === 1) {
-        var arg = args[0];
-
-        if (arg instanceof BindingMetadata) {
-          if (!$isNothing(arg.name)) {
-            metadata.name = arg.name;
-          }
-
-          arg.mergeInto(metadata);
-          return this;
-        }
-
-        if (arg instanceof BindingConstraint) {
-          arg.require(metadata);
-
-          return this;
-        }
-
-        if ($isFunction(arg)) {
-          var constranint = arg();
-
-          if (constranint instanceof BindingConstraint) {
-            constranint.require(metadata);
-
-            return this;
-          }
-        }
-      }
-
-      throw new Error("require expects a key/value, BindingMetadata, BindingConstraint or constraint decorator.");
-    }
-
-    build() {
-      return _$u(this).metadata;
-    }
-
-  }
-
-  var defaultKeyResolver$2 = new KeyResolver();
-  /**
-   * Shortcut for handling a callback.
-   * @method
-   * @static
-   * @param   {Function}  handler     -  handles callbacks
-   * @param   {Any}       constraint  -  callback constraint
-   * @returns {Handler} callback handler.
-   * @for Handler
-   */
-
-  Handler.accepting = function (handler, constraint) {
-    var accepting = new Handler();
-    handles.addHandler(accepting, constraint, handler);
-    return accepting;
-  };
-  /**
-   * Shortcut for providing a callback.
-   * @method
-   * @static
-   * @param  {Function}  provider    -  provides callbacks
-   * @param  {Any}       constraint  -  callback constraint
-   * @returns {Handler} callback provider.
-   * @for Handler
-   */
-
-
-  Handler.providing = function (provider, constraint) {
-    var providing = new Handler();
-    provides.addHandler(providing, constraint, provider);
-    return providing;
-  };
-
-  Handler.implement({
-    /**
-     * Handles the callback.
-     * @method command
-     * @param   {Object}  callback  -  callback
-     * @returns {Any} optional result
-     * @for Handler
-     */
-    command(callback) {
-      var command = new Command(callback);
-
-      if (!this.handle(command, false)) {
-        throw new NotHandledError(callback);
-      }
-
-      return command.callbackResult;
-    },
-
-    /**
-     * Handles the callback greedily.
-     * @method commandAll
-     * @param   {Object}  callback  -  callback
-     * @returns {Any} optional results.
-     * @for Handler
-     */
-    commandAll(callback) {
-      var command = new Command(callback, true);
-
-      if (!this.handle(command, true)) {
-        throw new NotHandledError(callback);
-      }
-
-      return command.callbackResult;
-    },
-
-    /**
-     * Resolves the key.
-     * @method resolve
-     * @param   {Any}       key            -  key
-     * @param   {Function}  [constraints]  -  optional constraints
-     * @returns {Any}  resolved key.  Could be a promise.
-     * @for Handler
-     * @async
-     */
-    resolve(key, constraints) {
-      var inquiry;
-
-      if (key instanceof Inquiry) {
-        if (key.isMany) {
-          throw new Error("Requested Inquiry expects multiple results.");
-        }
-
-        inquiry = key;
-      } else {
-        inquiry = new Inquiry(key);
-      }
-
-      constraints == null ? void 0 : constraints(new ConstraintBuilder(inquiry));
-
-      if (this.handle(inquiry, false)) {
-        return inquiry.callbackResult;
-      }
-    },
-
-    /**
-     * Resolves the key greedily.
-     * @method resolveAll
-     * @param   {Any}       key            -  key
-     * @param   {Function}  [constraints]  -  optional constraints
-     * @returns {Array} resolved key.  Could be a promise.
-     * @for Handler
-     * @async
-     */
-    resolveAll(key, constraints) {
-      var inquiry;
-
-      if (key instanceof Inquiry) {
-        if (!key.isMany) {
-          throw new Error("Requested Inquiry expects a single result.");
-        }
-
-        inquiry = key;
-      } else {
-        inquiry = new Inquiry(key, true);
-      }
-
-      constraints == null ? void 0 : constraints(new ConstraintBuilder(inquiry));
-      return this.handle(inquiry, true) ? inquiry.callbackResult : [];
-    },
-
-    /**
-     * Looks up the key.
-     * @method lookup
-     * @param   {Any}  key  -  key
-     * @returns {Any}  value of key.
-     * @for Handler
-     */
-    lookup(key) {
-      var lookup;
-
-      if (key instanceof Lookup) {
-        if (key.isMany) {
-          throw new Error("Requested Lookup expects multiple results.");
-        }
-
-        lookup = key;
-      } else {
-        lookup = new Lookup(key);
-      }
-
-      if (this.handle(lookup, false)) {
-        return lookup.callbackResult;
-      }
-    },
-
-    /**
-     * Looks up the key greedily.
-     * @method lookupAll
-     * @param   {Any}  key  -  key
-     * @returns {Array}  value(s) of key.
-     * @for Handler
-     */
-    lookupAll(key) {
-      var lookup;
-
-      if (key instanceof Lookup) {
-        if (!key.isMany) {
-          throw new Error("Requested Lookup expects a single result.");
-        }
-
-        lookup = key;
-      } else {
-        lookup = new Lookup(key, true);
-      }
-
-      return this.handle(lookup, true) ? lookup.callbackResult : [];
-    },
-
-    /**
-     * Creates an instance of the `type`.
-     * @method command
-     * @param   {Function}  type  -  type
-     * @returns {Any} instance of the type.
-     * @for Handler
-     */
-    create(type) {
-      var creation = new Creation(type);
-
-      if (!this.handle(creation, false)) {
-        throw new NotHandledError(creation);
-      }
-
-      return creation.callbackResult;
-    },
-
-    /**
-     * Creates instances of the `type`.
-     * @method createAll
-     * @param   {Function}  type  -  type
-     * @returns {Any} instances of the type.
-     * @for Handler
-     */
-    createAll(type) {
-      var creation = new Creation(type, true);
-
-      if (!this.handle(creation, true)) {
-        throw new NotHandledError(creation);
-      }
-
-      return creation.callbackResult;
-    },
-
-    /**
-     * Decorates the handler.
-     * @method decorate
-     * @param   {Object}  decorations  -  decorations
-     * @returns {Handler} decorated callback handler.
-     * @for Handler
-     */
-    decorate(decorations) {
-      return $decorate(this, decorations);
-    },
-
-    /**
-     * Decorates the handler for filtering callbacks.
-     * @method filter
-     * @param   {Function}  filter     -  filter
-     * @param   {boolean}   reentrant  -  true if reentrant, false otherwise
-     * @returns {Handler} filtered callback handler.
-     * @for Handler
-     */
-    filter(filter, reentrant) {
-      if (!$isFunction(filter)) {
-        throw new TypeError(`Invalid filter: ${filter} is not a function.`);
-      }
-
-      return this.decorate({
-        handleCallback(callback, greedy, composer) {
-          if (!reentrant && callback instanceof Composition) {
-            return this.base(callback, greedy, composer);
-          }
-
-          var base = this.base;
-          return filter(callback, composer, () => base.call(this, callback, greedy, composer));
-        }
-
-      });
-    },
-
-    /**
-     * Decorates the handler for applying aspects to callbacks.
-     * @method aspect
-     * @param   {Function}  before     -  before action.  Return false to reject
-     * @param   {Function}  action     -  after action
-     * @param   {boolean}   reentrant  -  true if reentrant, false otherwise
-     * @returns {Handler}  callback handler aspect.
-     * @throws  {RejectedError} An error if before returns an unaccepted promise.
-     * @for Handler
-     */
-    $aspect(before, after, reentrant) {
-      return this.filter((callback, composer, proceed) => {
-        if ($isFunction(before)) {
-          var test = before(callback, composer);
-
-          if ($isPromise(test)) {
-            var hasResult = ("callbackResult" in callback),
-                accept = test.then(accepted => {
-              if (accepted !== false) {
-                aspectProceed(callback, composer, proceed, after, accepted);
-                return hasResult ? callback.callbackResult : true;
-              }
-
-              return Promise.reject(new RejectedError(callback));
-            });
-
-            if (hasResult) {
-              callback.callbackResult = accept;
-            }
-
-            return true;
-          } else if (test === false) {
-            throw new RejectedError(callback);
-          }
-        }
-
-        return aspectProceed(callback, composer, proceed, after);
-      }, reentrant);
-    },
-
-    resolveArgs(args) {
-      var _this = this;
-
-      if ($isNothing(args) || args.length === 0) {
-        return [];
-      }
-
-      var resolved = [],
-          promises = [];
-
-      var _loop = function (i) {
-        var arg = args[i];
-        if ($isNothing(arg)) return "continue";
-        var resolver = arg.keyResolver || defaultKeyResolver$2,
-            validate = resolver.validate;
-
-        if ($isFunction(validate)) {
-          validate.call(resolver, arg);
-        }
-
-        var dep = resolver.resolve(arg, _this);
-        if ($isNothing(dep)) return {
-          v: null
-        };
-
-        if ($optional.test(dep)) {
-          resolved[i] = $contents(dep);
-        } else if ($isPromise(dep)) {
-          promises.push(dep.then(result => resolved[i] = result));
-        } else {
-          resolved[i] = dep;
-        }
-      };
-
-      for (var i = 0; i < args.length; ++i) {
-        var _ret = _loop(i);
-
-        if (_ret === "continue") continue;
-        if (typeof _ret === "object") return _ret.v;
-      }
-
-      if (promises.length === 0) {
-        return resolved;
-      }
-
-      if (promises.length === 1) {
-        return promises[0].then(() => resolved);
-      }
-
-      return Promise.all(promises).then(() => resolved);
-    },
-
-    /**
-     * Decorates the handler to provide one or more values.
-     * @method $provide
-     * @param   {Array}  ...values  -  values to provide
-     * @returns {Handler}  decorated callback handler.
-     * @for Handler
-     */
-    $provide(...values) {
-      values = $flatten(values, true);
-
-      if (values.length > 0) {
-        var provider = this.decorate();
-        values.forEach(value => provides.addHandler(provider, value));
-        return provider;
-      }
-
-      return this;
-    },
-
-    $with(...values) {
-      return this.$provide(values);
-    },
-
-    $withKeyValues(keyValues) {
-      if ($isPlainObject(keyValues)) {
-        var provider = this.decorate();
-
-        for (var key in keyValues) {
-          provides.addHandler(provider, key, keyValues[key]);
-        }
-
-        return provider;
-      }
-
-      if (keyValues instanceof Map) {
-        var _provider = this.decorate();
-
-        for (var [_key, value] of keyValues) {
-          provides.addHandler(_provider, _key, value);
-        }
-
-        return _provider;
-      }
-
-      throw new TypeError("The keyValues must be an object literal or Map.");
-    },
-
-    $withBindings(target, keyValues) {
-      if ($isNothing(target)) {
-        throw new Error("The scope argument is required.");
-      }
-
-      if ($isPlainObject(keyValues)) {
-        function getValue(inquiry, context) {
-          var _inquiry$parent, _inquiry$parent$bindi;
-
-          if (((_inquiry$parent = inquiry.parent) == null ? void 0 : (_inquiry$parent$bindi = _inquiry$parent.binding) == null ? void 0 : _inquiry$parent$bindi.constraint) === target) {
-            var value = keyValues[inquiry.key];
-            return $isFunction(value) ? value(inquiry, context) : value;
-          }
-        }
-
-        var provider = this.decorate();
-
-        for (var key in keyValues) {
-          provides.addHandler(provider, key, getValue);
-        }
-
-        return provider;
-      }
-
-      if (keyValues instanceof Map) {
-        function getValue(inquiry) {
-          var _inquiry$parent2, _inquiry$parent2$bind;
-
-          if (((_inquiry$parent2 = inquiry.parent) == null ? void 0 : (_inquiry$parent2$bind = _inquiry$parent2.binding) == null ? void 0 : _inquiry$parent2$bind.constraint) === target) {
-            var value = keyValues.get(inquiry.key);
-            return $isFunction(value) ? value(inquiry, context) : value;
-          }
-        }
-
-        var _provider2 = this.decorate();
-
-        for (var [_key2, value] of keyValues.keys) {
-          provides.addHandler(_provider2, _key2, getValue);
-        }
-
-        return _provider2;
-      }
-
-      throw new TypeError("The keyValues must be an object literal or Map.");
-    },
-
-    /**
-     * Builds a handler chain.
-     * @method next
-     * @param   {Any}  [...handlers]  -  handler chain members
-     * @returns {Handler}  chaining callback handler.
-     * @for Handler
-     */
-    $chain(...handlers) {
-      switch (handlers.length) {
-        case 0:
-          return this;
-
-        case 1:
-          return new CascadeHandler(this, handlers[0]);
-
-        default:
-          return new CompositeHandler(this, ...handlers);
-      }
-    },
-
-    /**
-     * Prevents continuous or concurrent handling on a target.
-     * @method $guard
-     * @param   {Object}  target              -  target to guard
-     * @param   {string}  [property='guard']  -  property for guard state
-     * @returns {Handler}  guarding callback handler.
-     * @for Handler
-     */
-    $guard(target, property) {
-      if (target) {
-        var guarded = false;
-        property = property || "guarded";
-        var propExists = (property in target);
-        return this.$aspect(() => {
-          if (guarded = target[property]) {
-            return false;
-          }
-
-          target[property] = true;
-          return true;
-        }, () => {
-          if (!guarded) {
-            target[property] = undefined;
-
-            if (!propExists) {
-              delete target[property];
-            }
-          }
-        });
-      }
-
-      return this;
-    },
-
-    /**
-     * Tracks the activity counts associated with a target. 
-     * @method $activity
-     * @param   {Object}  target                 -  target to track
-     * @param   {Object}  [ms=50]                -  delay to wait before tracking
-     * @param   {string}  [property='activity']  -  property for activity state
-     * @returns {Handler}  activity callback handler.
-     * @for Handler
-     */
-    $activity(target, ms, property) {
-      property = property || "$$activity";
-      var propExists = (property in target);
-      return this.$aspect(() => {
-        var state = {
-          enabled: false
-        };
-        setTimeout(() => {
-          if ("enabled" in state) {
-            state.enabled = true;
-            var activity = target[property] || 0;
-            target[property] = ++activity;
-          }
-        }, !$isNothing(ms) ? ms : 50);
-        return state;
-      }, (_, composer, state) => {
-        if (state.enabled) {
-          var activity = target[property];
-
-          if (!activity || activity === 1) {
-            target[property] = undefined;
-
-            if (!propExists) {
-              delete target[property];
-            }
-          } else {
-            target[property] = --activity;
-          }
-        }
-
-        delete state.enabled;
-      });
-    },
-
-    /**
-     * Ensures all return values are promises..
-     * @method $promises
-     * @returns {Handler}  promising callback handler.
-     * @for Handler
-     */
-    $promise() {
-      return this.filter((callback, composer, proceed) => {
-        if (!("callbackResult" in callback)) {
-          return proceed();
-        }
-
-        try {
-          var handled = proceed();
-
-          if (handled) {
-            var result = callback.callbackResult;
-            callback.callbackResult = $isPromise(result) ? result : Promise.resolve(result);
-          }
-
-          return handled;
-        } catch (ex) {
-          callback.callbackResult = Promise.reject(ex);
-          return true;
-        }
-      });
-    },
-
-    /**
-     * Configures the receiver to set timeouts on all promises.
-     * @method $timeout
-     * @param   {number}            ms       -  duration before promise times out
-     * @param   {Function | Error}  [error]  -  error instance or custom error class
-     * @returns {Handler}  timeout callback handler.
-     * @for Handler
-     */
-    $timeout(ms, error) {
-      return this.filter((callback, composer, proceed) => {
-        var handled = proceed();
-
-        if (!("callbackResult" in callback)) {
-          return handled;
-        }
-
-        if (handled) {
-          var result = callback.callbackResult;
-
-          if ($isPromise(result)) {
-            callback.callbackResult = new Promise(function (resolve, reject) {
-              var timeout;
-              result.then(res => {
-                if (timeout) {
-                  clearTimeout(timeout);
-                }
-
-                resolve(res);
-              }, err => {
-                if (timeout) {
-                  clearTimeout(timeout);
-                }
-
-                reject(err);
-              });
-              timeout = setTimeout(function () {
-                if (!error) {
-                  error = new TimeoutError(callback);
-                } else if ($isFunction(error)) {
-                  error = Reflect.construct(error, [callback]);
-                }
-
-                if ($isFunction(result.reject)) {
-                  result.reject(error); // TODO: cancel
-                }
-
-                reject(error);
-              }, ms);
-            });
-          }
-        }
-
-        return handled;
-      });
-    }
-
-  });
-
-  function aspectProceed(callback, composer, proceed, after, state) {
-    var promise;
-
-    try {
-      var handled = proceed();
-
-      if (handled) {
-        var result = callback.callbackResult;
-
-        if ($isPromise(result)) {
-          promise = result; // Use 'fulfilled' or 'rejected' handlers instead of 'finally' to ensure
-          // aspect boundary is consistent with synchronous invocations and avoid
-          // reentrancy issues.
-
-          if ($isFunction(after)) {
-            promise.then(result => after(callback, composer, state)).catch(error => after(callback, composer, state));
-          }
-        }
-      }
-
-      return handled;
-    } finally {
-      if (!promise && $isFunction(after)) {
-        after(callback, composer, state);
-      }
-    }
-  }
-
-  var _dec$k, _class$o;
-
-  var _$v = createKey();
-
-  class Options extends exports.Base {
-    get canBatch() {
-      return false;
-    }
-
-    get canFilter() {
-      return false;
-    }
-
-    get canInfer() {
-      return false;
-    }
-    /**
-     * Merges this options data into `options`.
-     * @method mergeInto
-     * @param   {Options}  options  -  options to receive data
-     * @returns {boolean} true if options could be merged into.
-     */
-
-
-    mergeInto(options) {
-      if (!(options instanceof this.constructor)) {
-        return false;
-      }
-
-      var descriptors = getPropertyDescriptors(this),
-          keys = Reflect.ownKeys(descriptors);
-      keys.forEach(key => {
-        if (Reflect.has(Options.prototype, key)) return;
-        var keyValue = this[key],
-            descriptor = descriptors[key];
-
-        if (keyValue !== undefined) {
-          var optionsValue = options[key];
-
-          if (optionsValue === undefined || !options.hasOwnProperty(key)) {
-            options[key] = copyOptionsValue(keyValue);
-          } else if (!$isNothing(keyValue)) {
-            this.mergeKeyInto(options, key, keyValue, optionsValue);
-          }
-        }
-      });
-      return true;
-    }
-
-    mergeKeyInto(options, key, keyValue, optionsValue) {
-      if (Array.isArray(keyValue)) {
-        options[key] = options[key].concat(copyOptionsValue(keyValue));
-        return;
-      }
-
-      var mergeInto = keyValue.mergeInto;
-
-      if ($isFunction(mergeInto)) {
-        mergeInto.call(keyValue, optionsValue);
-      }
-    }
-
-    copy() {
-      var options = Reflect.construct(this.constructor, emptyArray);
-      this.mergeInto(options);
-      return options;
-    }
-
-  }
-
-  function copyOptionsValue(optionsValue) {
-    if ($isNothing(optionsValue)) {
-      return optionsValue;
-    }
-
-    if (Array.isArray(optionsValue)) {
-      return optionsValue.map(copyOptionsValue);
-    }
-
-    if ($isFunction(optionsValue.copy)) {
-      return optionsValue.copy();
-    }
-
-    return optionsValue;
-  }
-
-  var OptionsResolver = (_dec$k = conformsTo(KeyResolving), _dec$k(_class$o = class OptionsResolver {
-    constructor(optionsType) {
-      _$v(this).optionsType = optionsType;
-    }
-
-    validate(typeInfo) {
-      var optionsType = _$v(this).optionsType || typeInfo.type;
-
-      if ($isNothing(optionsType)) {
-        throw new TypeError("Unable to determine @options argument type.");
-      }
-
-      if (!(optionsType.prototype instanceof Options)) {
-        throw new TypeError(`@options requires an Options argument, but found '${optionsType.name}'.`);
-      }
-    }
-
-    resolve(typeInfo, handler) {
-      var optionsType = _$v(this).optionsType || typeInfo.type,
-          options = handler.$getOptions(optionsType);
-      return $isNothing(options) ? $optional(options) : options;
-    }
-
-  }) || _class$o);
-  var options = createTypeInfoDecorator((key, typeInfo, [optionsType]) => {
-    typeInfo.keyResolver = new OptionsResolver(optionsType);
-  });
-
-  /**
-   * Register the options to be applied by a Handler.
-   * @method registerOptions
-   * @static
-   * @param   {Function}        optionsType  -  type of options
-   * @param   {string|symbol}   optionsKey   -  options key  
-   * @returns {boolean} true if successful, false otherwise.
-   * @for Handler
-   */
-
-  Handler.registerOptions = function (optionsType, optionsKey) {
-    validateOptionsType(optionsType);
-
-    if ($isNothing(optionsKey)) {
-      throw new TypeError("The Options key is required.");
-    }
-
-    var actualKey = optionsKey.startsWith("$") ? optionsKey : `$${optionsKey}`;
-
-    if (Handler.prototype.hasOwnProperty(actualKey)) {
-      throw new Error(`Options key '${optionsKey}' is already defined.`);
-    }
-
-    Handler.implement({
-      [actualKey](options) {
-        if ($isNothing(options)) return this;
-
-        if (!(options instanceof optionsType)) {
-          options = Reflect.construct(optionsType, emptyArray).extend(options);
-        }
-
-        return this.$withOptions(options);
-      }
-
-    });
-    return true;
-  };
-
-  Handler.implement({
-    $withOptions(options) {
-      if ($isNothing(options)) return this;
-      var optionsType = $classOf(options);
-      validateOptionsType(optionsType);
-      return this.decorate({
-        handleCallback(callback, greedy, composer) {
-          var fillOpttions = callback;
-
-          if (callback instanceof Composition) {
-            fillOpttions = callback.callback;
-          }
-
-          if (fillOpttions instanceof optionsType) {
-            options.mergeInto(fillOpttions);
-
-            if (greedy) {
-              this.base(callback, greedy, composer);
-            }
-
-            return true;
-          }
-
-          return this.base(callback, greedy, composer);
-        }
-
-      });
-      /* Alternatives
-      -- Explicit decoration for Babel Symbol bug
-      const method  = Symbol(),
-            handler = { [method] (receiver) { 
-                options.mergeInto(receiver);
-            } };
-      Object.defineProperty(handler, method,
-          Reflect.decorate([handles(optionsType)], handler, method,
-              Object.getOwnPropertyDescriptor(handler, method)));
-      return this.decorate(handler);
-        -- Babel decorator bug for Symbol defined methods
-      return this.decorate({
-          @handles(optionsType)
-          [Symbol()](receiver) {
-              options.mergeInto(receiver);         
-          }
-      });
-      */
-    },
-
-    $getOptions(optionsType) {
-      validateOptionsType(optionsType);
-      var options = new optionsType();
-      return this.handle(options, true) ? options : null;
-    }
-
-  });
-  function handlesOptions(optionsKey) {
-    if ($isFunction(optionsKey)) {
-      throw new SyntaxError("@handlesOptions requires an options key argument");
-    }
-
-    return (target, key, descriptor) => {
-      if ($isNothing(descriptor)) {
-        Handler.registerOptions(target, optionsKey);
-      } else {
-        throw new SyntaxError("@handlesOptions can only be applied to classes.");
-      }
-    };
-  }
-
-  function validateOptionsType(optionsType) {
-    if ($isNothing(optionsType)) {
-      throw new Error("The options type is required.");
-    }
-
-    if (!$isFunction(optionsType) || !(optionsType.prototype instanceof Options)) {
-      throw new TypeError(`The options type '${optionsType}' does not extend Options.`);
-    }
-  }
-
-  var _$w = createKeyChain();
-  /**
-   * Delegates properties and methods to a callback handler using 
-   * {{#crossLink "HandleMethod"}}{{/crossLink}}.
-   * @class HandleMethodDelegate
-   * @constructor
-   * @param   {Handler}  handler  -  forwarding handler 
-   * @extends Delegate
-   */
-
-
-  class HandleMethodDelegate extends Delegate {
-    constructor(handler) {
-      super();
-      _$w(this).handler = handler;
-    }
-
-    get handler() {
-      return _$w(this).handler;
-    }
-
-    get(protocol, propertyName) {
-      return delegate$1(this, MethodType.Get, protocol, propertyName, null);
-    }
-
-    set(protocol, propertyName, propertyValue) {
-      return delegate$1(this, MethodType.Set, protocol, propertyName, propertyValue);
-    }
-
-    invoke(protocol, methodName, args) {
-      return delegate$1(this, MethodType.Invoke, protocol, methodName, args);
-    }
-
-  }
-
-  function delegate$1(delegate, methodType, protocol, methodName, args) {
-    var handler = delegate.handler,
-        options = CallbackOptions.None,
-        semantics = new CallbackSemantics();
-    handler.handle(semantics, true);
-    if (!semantics.isSpecified(CallbackOptions.Duck) && DuckTyping.isAdoptedBy(protocol)) options |= CallbackOptions.Duck;
-    if (!semantics.isSpecified(CallbackOptions.Strict) && StrictProtocol.isAdoptedBy(protocol)) options |= CallbackOptions.Strict;
-
-    if (options != CallbackOptions.None) {
-      semantics.setOption(options, true);
-      handler = handler.$callOptions(options);
-    }
-
-    var handleMethod = new HandleMethod(methodType, protocol, methodName, args, semantics),
-        inference = handleMethod.inferCallback();
-
-    if (!handler.handle(inference)) {
-      throw handleMethod.notHandledError();
-    }
-
-    var result = inference.callbackResult;
-
-    if ($isPromise(result)) {
-      return result.catch(error => {
-        if (error instanceof NotHandledError) {
-          if (!(semantics.isSpecified(CallbackOptions.BestEffort) && semantics.hasOption(CallbackOptions.BestEffort))) {
-            throw handleMethod.notHandledError();
-          }
-        } else {
-          throw error;
-        }
-      });
-    }
-
-    return result;
-  }
-
-  Handler.implement({
-    /**
-     * Converts the callback handler to a {{#crossLink "Delegate"}}{{/crossLink}}.
-     * @method toDelegate
-     * @returns {HandleMethodDelegate}  delegate for this callback handler.
-     */
-    toDelegate() {
-      return new HandleMethodDelegate(this);
-    },
-
-    /**
-     * Creates a proxy for this Handler over the `protocol`.
-     * @method proxy
-     * @param   {Protocol}  protocol  -  the protocol to proxy.
-     * @returns {Protocol}  an instance of the protocol bound to this handler.
-     */
-    proxy(protocol) {
-      if (!Protocol.isProtocol(protocol)) {
-        throw new TypeError("The protocol is not valid.");
-      }
-
-      return new protocol(new HandleMethodDelegate(this));
-    }
-
-  });
-
-  var _dec$l, _class$p, _dec2$7, _class2$6;
-
-  var _$x = createKey();
-
-  var Initializer = (_dec$l = conformsTo(Filtering), _dec$l(_class$p = class Initializer {
-    constructor(initializer) {
-      if (!$isFunction(initializer)) {
-        throw new Error("The initializer must be a function.");
-      }
-
-      _$x(this).initializer = initializer;
-    }
-
-    get order() {
-      return Number.MAX_SAFE_INTEGER - 100;
-    }
-
-    next(callback, {
-      next
-    }) {
-      var instance = next();
-      return $isPromise(instance) ? instance.then(result => _initialize.call(this, result)) : _initialize.call(this, instance);
-    }
-
-  }) || _class$p);
-
-  function _initialize(instance) {
-    var initializer = _$x(this).initializer,
-        promise = initializer.call(instance);
-
-    return $isPromise(promise) ? promise.then(() => instance) : instance;
-  }
-
-  var InitializerProvider = (_dec2$7 = conformsTo(FilteringProvider), _dec2$7(_class2$6 = class InitializerProvider {
-    constructor(initializer) {
-      _$x(this).initializer = [new Initializer(initializer)];
-    }
-
-    get required() {
-      return true;
-    }
-
-    appliesTo(callback) {
-      return callback instanceof Inquiry || callback instanceof Creation;
-    }
-
-    getFilters(binding, callback, composer) {
-      return _$x(this).initializer;
-    }
-
-  }) || _class2$6);
-  function initialize(target, key, descriptor) {
-    if (!isDescriptor(descriptor)) {
-      throw new SyntaxError("@initialize cannot be applied to classes.");
-    }
-
-    var {
-      value
-    } = descriptor;
-
-    if (!$isFunction(value)) {
-      throw new SyntaxError("@initialize can only be applied to methods.");
-    }
-
-    descriptor.value = cannotCallInitializer;
-    var constructor = target.constructor,
-        filters = filter.getOrCreateOwn(target, "constructor", () => new FilteredScope());
-
-    if ((constructor == null ? void 0 : constructor.prototype) === target) {
-      filter.getOrCreateOwn(constructor, "constructor", () => filters);
-    }
-
-    filters.addFilters(new InitializerProvider(value));
-    return descriptor;
-  }
-
-  function cannotCallInitializer() {
-    throw new Error("An @initialize method cannot be called directly.");
-  }
-
-  var _$y = createKey();
-
-  class InjectResolver extends KeyResolver {
-    constructor(key) {
-      if ($isNothing(key)) {
-        throw new Error("The key argument is required.");
-      }
-
-      super();
-      _$y(this).key = key;
-    }
-
-    get key() {
-      return _$y(this).key;
-    }
-
-    createInquiry(typeInfo, parent) {
-      var many = typeInfo.flags.hasFlag(TypeFlags.Array);
-      return new Inquiry(this.key, many, parent);
-    }
-
-  }
-  var inject = createTypeInfoDecorator((key, typeInfo, [actualKey]) => {
-    typeInfo.keyResolver = new InjectResolver(actualKey || key);
-  });
-
-  var _dec$m, _class$q;
-  var $proxy = $createQualifier();
-  var ProxyResolver = (_dec$m = conformsTo(KeyResolving), _dec$m(_class$q = class ProxyResolver {
-    validate(typeInfo) {
-      if ($isNothing(typeInfo.type)) {
-        throw new TypeError("Unable to determine @proxy argument type.");
-      }
-
-      if (!typeInfo.flags.hasFlag(TypeFlags.Protocol)) {
-        throw new TypeError("@proxy requires a Protocol argument.");
-      }
-
-      if (typeInfo.flags.hasFlag(TypeFlags.Array)) {
-        throw new TypeError("@proxy arguments cannot be collections.");
-      }
-    }
-
-    resolve(typeInfo, handler) {
-      return handler.proxy(typeInfo.type);
-    }
-
-  }) || _class$q);
-  var proxyResolver = new ProxyResolver();
-  TypeInfo.registerQualifier($proxy, ti => ti.keyResolver = proxyResolver);
-  var proxy = createTypeInfoDecorator((key, typeInfo, [type]) => {
-    var protocol = TypeInfo.parse(type);
-    protocol.keyResolver = proxyResolver;
-    typeInfo.merge(protocol);
-  });
 
   /**
    * Protocol for targets that manage disposal lifecycle.
@@ -10178,9 +7756,9 @@
     }
   }
 
-  var _dec$n, _class$r;
+  var _dec$f, _class$i;
 
-  var _$z = createKeyChain();
+  var _$n = createKeyChain();
   /**
    * Represents the state of a {{#crossLink "Context"}}{{/crossLink}}.
    * @class ContextState
@@ -10257,11 +7835,11 @@
    * @uses Disposing
    */
 
-  var Context$1 = (_dec$n = conformsTo(Parenting, Disposing), traversable(_class$r = _dec$n(_class$r = class Context extends CompositeHandler {
+  var Context$1 = (_dec$f = conformsTo(Parenting, Disposing), traversable(_class$i = _dec$f(_class$i = class Context extends CompositeHandler {
     constructor(parent) {
       super();
 
-      var _this = _$z(this);
+      var _this = _$n(this);
 
       _this.id = assignID(this);
       _this.parent = parent;
@@ -10271,23 +7849,23 @@
     }
 
     get id() {
-      return _$z(this).id;
+      return _$n(this).id;
     }
 
     get state() {
-      return _$z(this).state;
+      return _$n(this).state;
     }
 
     get parent() {
-      return _$z(this).parent;
+      return _$n(this).parent;
     }
 
     get children() {
-      return _$z(this).children.slice();
+      return _$n(this).children.slice();
     }
 
     get hasChildren() {
-      return _$z(this).children.length > 0;
+      return _$n(this).children.length > 0;
     }
 
     get root() {
@@ -10306,13 +7884,13 @@
       var parent = this,
           childContext = new ($classOf(this))(this).extend({
         end() {
-          var index = _$z(parent).children.indexOf(childContext);
+          var index = _$n(parent).children.indexOf(childContext);
 
           if (index < 0) return;
           var notifier = makeNotifier.call(parent);
           notifier.childContextEnding(childContext);
 
-          _$z(parent).children.splice(index, 1);
+          _$n(parent).children.splice(index, 1);
 
           this.base();
           notifier.childContextEnded(childContext);
@@ -10320,7 +7898,7 @@
 
       });
 
-      _$z(this).children.push(childContext);
+      _$n(this).children.push(childContext);
 
       return childContext;
     }
@@ -10335,7 +7913,7 @@
 
     handleCallback(callback, greedy, composer) {
       var handled = false,
-          axis = _$z(this).axis;
+          axis = _$n(this).axis;
 
       if (!axis) {
         handled = super.handleCallback(callback, greedy, composer);
@@ -10351,7 +7929,7 @@
         return !!handled;
       }
 
-      delete _$z(this).axis;
+      delete _$n(this).axis;
 
       if (axis === TraversingAxis.Self) {
         return super.handleCallback(callback, greedy, composer);
@@ -10370,7 +7948,7 @@
         throw new TypeError("Invalid axis type supplied.");
       }
 
-      _$z(this).axis = axis;
+      _$n(this).axis = axis;
       return this.handle(callback, greedy, composer);
     }
 
@@ -10378,12 +7956,12 @@
       ensureActive.call(this);
       if ($isNothing(observer)) return;
 
-      _$z(this).observers.push(observer);
+      _$n(this).observers.push(observer);
 
       return () => {
         var {
           observers
-        } = _$z(this);
+        } = _$n(this);
 
         var index = observers.indexOf(observer);
 
@@ -10419,7 +7997,7 @@
     }
 
     end() {
-      var _this = _$z(this);
+      var _this = _$n(this);
 
       if (_this.state == ContextState.Active) {
         var notifier = makeNotifier.call(this);
@@ -10428,7 +8006,7 @@
         this.unwind();
         _this.state = ContextState.Ended;
         notifier.contextEnded(this);
-        delete _$z(this).observers;
+        delete _$n(this).observers;
       }
     }
 
@@ -10436,24 +8014,24 @@
       this.end();
     }
 
-  }) || _class$r) || _class$r);
+  }) || _class$i) || _class$i);
 
   function ensureActive() {
-    if (_$z(this).state != ContextState.Active) {
+    if (_$n(this).state != ContextState.Active) {
       throw new Error("The context has already ended.");
     }
   }
 
   function makeNotifier() {
-    return new ContextObserver(_$z(this).observers.slice());
+    return new ContextObserver(_$n(this).observers.slice());
   }
 
   var axisBuilder = {
     axis(axis) {
-      return this.decorate({
+      return this.$decorate({
         handleCallback(callback, greedy, composer) {
           if (!(callback instanceof Composition)) {
-            _$z(this).axis = axis;
+            _$n(this).axis = axis;
           }
 
           return this.base(callback, greedy, composer);
@@ -10648,12 +8226,173 @@
 
   });
 
-  var _$A = createKey();
+  /**
+   * Standard filter precedence.
+   * @class Stage
+   * @extends Enum
+   */
+
+  var Stage = Enum({
+    /**
+     * Normal filters
+     * @property {number} Filter
+     */
+    Filter: 0,
+
+    /**
+     * Logging filters
+     * @property {number} Logging
+     */
+    Logging: 10,
+
+    /**
+     * Authorization filters
+     * @property {number} Authorization
+     */
+    Authorization: 30,
+
+    /**
+     * Validation filters
+     * @property {number} Validation
+     */
+    Validation: 50
+  });
+
+  var _dec$g, _class$j, _dec2$6, _class2$5;
+
+  var _$o = createKey();
+
+  var ConstraintFilter = (_dec$g = conformsTo(Filtering), _dec$g(_class$j = class ConstraintFilter {
+    get order() {
+      return Stage.Filter;
+    }
+
+    next(callback, {
+      provider,
+      next,
+      abort
+    }) {
+      if (!(provider instanceof ConstraintProvider)) {
+        return abort();
+      }
+
+      var metadata = callback.metadata;
+      return !(metadata == null || provider.constraint.matches(metadata)) ? abort() : next();
+    }
+
+  }) || _class$j);
+  var constraintFilter = [new ConstraintFilter()];
+  var ConstraintProvider = (_dec2$6 = conformsTo(FilteringProvider), _dec2$6(_class2$5 = class ConstraintProvider {
+    constructor(constraint) {
+      if ($isNothing(constraint)) {
+        throw new Error("The constraint argument is required.");
+      }
+
+      if (!(constraint instanceof BindingConstraint)) {
+        throw new TypeError("The constraint argument is not a BindingConstraint.");
+      }
+
+      _$o(this).constraint = constraint;
+    }
+
+    get required() {
+      return true;
+    }
+
+    get constraint() {
+      return _$o(this).constraint;
+    }
+
+    appliesTo(callback) {
+      return callback.metadata instanceof BindingMetadata;
+    }
+
+    getFilters(binding, callback, composer) {
+      return constraintFilter;
+    }
+
+  }) || _class2$5);
+
+  function createConstraintDecorator(createConstraint) {
+    if (!$isFunction(createConstraint)) {
+      throw new Error("The createConstraint argument must be a function.");
+    }
+
+    return function (target, key, descriptorOrIndex) {
+      if (arguments.length === 0) {
+        // ConstraintBuilder
+        return createConstraint();
+      }
+
+      if (isDescriptor(descriptorOrIndex))
+        /* member */
+        {
+          createConstraintFilter(createConstraint, target, key, descriptorOrIndex, emptyArray);
+        } else if (target != null && (key == null || typeof key == "string") && typeof descriptorOrIndex == "number")
+        /* parameter */
+        {
+          createConstrainedArgument(createConstraint, target, key, descriptorOrIndex, emptyArray);
+        } else {
+        var args = [...arguments];
+        return function (target, key, descriptorOrIndex) {
+          if (arguments.length === 0) {
+            // ConstraintBuilder
+            return createConstraint(...args);
+          }
+
+          if (key == null && descriptorOrIndex == null ||
+          /* class */
+          isDescriptor(descriptorOrIndex))
+            /* member */
+            {
+              createConstraintFilter(createConstraint, target, key, descriptorOrIndex, args);
+            } else if (target != null && (key == null || typeof key == "string") && typeof descriptorOrIndex == "number")
+            /* parameter */
+            {
+              createConstrainedArgument(createConstraint, target, key, descriptorOrIndex, args);
+            } else {
+            throw new SyntaxError("Constraints can be applied to classes, methods and arguments.");
+          }
+        };
+      }
+    };
+  }
+
+  function createConstraintFilter(createConstraint, target, key, descriptor, args) {
+    var decorator = createFilterDecorator((target, key, descriptor) => {
+      var constraint = createConstraint(...args);
+
+      if (!(constraint instanceof BindingConstraint)) {
+        throw new SyntaxError("The createConstraint function did not return a BindingConstraint.");
+      }
+
+      return new ConstraintProvider(constraint);
+    });
+    return descriptor == null
+    /* class */
+    ? decorator(args)(target, key, descriptor) : decorator(target, key, descriptor);
+  }
+
+  function createConstrainedArgument(createConstraint, target, key, parameterIndex, args) {
+    createTypeInfoDecorator((key, typeInfo) => {
+      var constraint = createConstraint(...args);
+
+      if (!(constraint instanceof BindingConstraint)) {
+        throw new SyntaxError("The createConstraint function did not return a BindingConstraint.");
+      }
+
+      typeInfo.addConstraint(constraint);
+    })(target, key, parameterIndex);
+  }
+
+  var constraint = createConstraintDecorator(constraint => constraint);
+
+  var _$p = createKey();
 
   class QualifierConstraint extends BindingConstraint {
     constructor(qualifier) {
       super();
-      _$A(this).qualifier = qualifier || Symbol();
+      _$p(this).qualifier = qualifier || Symbol();
     }
 
     require(metadata) {
@@ -10661,7 +8400,7 @@
         throw new Error("The metadata argument is required.");
       }
 
-      metadata.set(_$A(this).qualifier, null);
+      metadata.set(_$p(this).qualifier, null);
     }
 
     matches(metadata) {
@@ -10669,7 +8408,7 @@
         throw new Error("The metadata argument is required.");
       }
 
-      return metadata.isEmpty || metadata.has(_$A(this).qualifier);
+      return metadata.isEmpty || metadata.has(_$p(this).qualifier);
     }
 
   }
@@ -10767,12 +8506,12 @@
     }) || _class;
   };
 
-  var _$B = createKey();
+  var _$q = createKey();
 
   class ContextualLifestyle extends Lifestyle {
     constructor() {
       super();
-      _$B(this).cache = new Map();
+      _$q(this).cache = new Map();
     }
 
     isCompatibleWithParent(parent, {
@@ -10805,7 +8544,7 @@
         context = context.root;
       }
 
-      var cache = _$B(this).cache;
+      var cache = _$q(this).cache;
 
       if (cache.has(context)) {
         return cache.get(context);
@@ -10912,11 +8651,11 @@
   class ContextualLifestyleProvider extends LifestyleProvider {
     constructor(rooted) {
       super(new ContextualLifestyle());
-      _$B(this).rooted = rooted;
+      _$q(this).rooted = rooted;
     }
 
     get rooted() {
-      return _$B(this).rooted;
+      return _$q(this).rooted;
     }
 
   }
@@ -10927,14 +8666,79 @@
   var scoped = createFilterDecorator((target, key, descriptor, [rooted]) => rooted === true ? provideRootedContextual : provideContextual);
   var scopedRooted = createFilterDecorator((target, key, descriptor) => provideRootedContextual);
 
+  var _dec$h, _class$k;
+
+  var _$r = createKeyChain();
+  /**
+   * Protocol to participate in batched operations.
+   * @class Batching
+   * @extends Protocol
+   */
+
+
+  var Batching = Protocol.extend({
+    /**
+     * Completes the batching operation.
+     * @method complete
+     * @param   {Handler}  composer  - composition handler
+     * @returns {Any} the batching result.
+     */
+    complete(composer) {}
+
+  });
+  /**
+   * Coordinates batching operations through the protocol
+   * {{#crossLink "Batching"}}{{/crossLink}}.
+   * @class BatchingComplete
+   * @uses Batching
+   */
+
+  var BatchingComplete = Protocol.extend({
+    /**
+     * Completes the batching operation.
+     * @method complete
+     * @param   {Handler}  composer  - composition handler
+     * @returns {Array|Promise(Array)} an array or promise of array.
+     */
+    complete(composer) {}
+
+  });
+  var Batch = (_dec$h = conformsTo(BatchingComplete), _dec$h(_class$k = class Batch extends CompositeHandler {
+    constructor(...tags) {
+      super();
+      _$r(this).tags = $flatten(tags, true);
+    }
+
+    shouldBatch(tag) {
+      var tags = _$r(this).tags;
+
+      return tag && (tags.length == 0 || tags.indexOf(tag) >= 0);
+    }
+
+    complete(composer) {
+      var results = this.getHandlers().reduce((res, handler) => {
+        var result = Batching(handler).complete(composer);
+        return result ? [...res, result] : res;
+      }, []);
+      return results.some($isPromise) ? Promise.all(results) : results;
+    }
+
+  }) || _class$k);
+  class NoBatch extends Trampoline {
+    get canBatch() {
+      return false;
+    }
+
+  }
+
   Handler.implement({
     /**
-     * Establishes publish invocation semantics.
-     * @method $publish
-     * @returns {Handler} publish semantics.
+     * Establishes broadcast invocation semantics.
+     * @method $broadcast
+     * @returns {Handler} broadcast semantics.
      * @for Handler
      */
-    $publish() {
+    $broadcast() {
       var composer = this;
       var context = ContextualHelper.resolveContext(composer);
 
@@ -10945,7 +8749,7 @@
       return composer.$notify();
     },
 
-    $publishFromRoot() {
+    $broadcastFromRoot() {
       var composer = this;
       var context = ContextualHelper.resolveContext(composer);
 
@@ -10956,6 +8760,2216 @@
       return composer.$notify();
     }
 
+  });
+
+  var _$s = createKeyChain();
+  /**
+   * CallbackOptions flags enum
+   * @class CallbackOptions
+   * @extends Flags
+   */
+
+
+  var CallbackOptions = Flags({
+    /**
+     * @property {number} None
+     */
+    None: 0,
+
+    /**
+     * Requires no protocol conformance.
+     * @property {number} Duck
+     */
+    Duck: 1 << 0,
+
+    /**
+     * Requires callback to match exact protocol.
+     * @property {number} Strict
+     */
+    Strict: 1 << 1,
+
+    /**
+     * Delivers callback to all handlers, requiring at least one to handle it.
+     * @property {number} Broadcast
+     */
+    Greedy: 1 << 2,
+
+    /**
+     * Marks callback as optional.
+     * @property {number} BestEffort
+     */
+    BestEffort: 1 << 3,
+
+    /**
+     * Delivers callback to all handlers.
+     * @property {number} Notify
+     */
+    Notify: 1 << 2 | 1 << 3
+  });
+  /**
+   * Captures callback semantics.
+   * @class CallbackSemantics
+   * @constructor
+   * @param  {CallbackOptions}  options  -  callback options.
+   * @extends Composition
+   */
+
+  class CallbackSemantics extends Composition {
+    constructor(options) {
+      super();
+
+      var _this = _$s(this);
+
+      _this.options = CallbackOptions.None.addFlag(options);
+      _this.specified = _this.options;
+    }
+
+    get canBatch() {
+      return false;
+    }
+
+    get canFilter() {
+      return false;
+    }
+
+    get canInfer() {
+      return false;
+    }
+
+    hasOption(options) {
+      return _$s(this).options.hasFlag(options);
+    }
+
+    setOption(options, enabled) {
+      var _this = _$s(this);
+
+      _this.options = enabled ? _this.options.addFlag(options) : _this.options.removeFlag(options);
+      _this.specified = _this.specified.addFlag(options);
+    }
+
+    isSpecified(options) {
+      return _$s(this).specified.hasFlag(options);
+    }
+
+    mergeInto(semantics) {
+      var items = CallbackOptions.items;
+
+      for (var i = 0; i < items.length; ++i) {
+        var option = +items[i];
+
+        if (this.isSpecified(option) && !semantics.isSpecified(option)) {
+          semantics.setOption(option, this.hasOption(option));
+        }
+      }
+    }
+
+  }
+  Handler.implement({
+    /**
+     * Establishes duck callback semantics.
+     * @method $duck
+     * @returns {Handler} duck semantics.
+     * @for Handler
+     */
+    $duck() {
+      return this.$callOptions(CallbackOptions.Duck);
+    },
+
+    /**
+     * Establishes strict callback semantics.
+     * @method $strict
+     * @returns {Handler} strict semantics.
+     * @for Handler
+     */
+    $strict() {
+      return this.$callOptions(CallbackOptions.Strict);
+    },
+
+    /**
+     * Establishes greedy callback semantics.
+     * @method $greedy
+     * @returns {Handler} greedy semanics.
+     * @for Handler
+     */
+    $greedy() {
+      return this.$callOptions(CallbackOptions.Greedy);
+    },
+
+    /**
+     * Establishes best-effort callback semantics.
+     * @method $bestEffort
+     * @returns {Handler} best-effort semanics.
+     * @for Handler
+     */
+    $bestEffort() {
+      return this.$callOptions(CallbackOptions.BestEffort);
+    },
+
+    /**
+     * Establishes notification callback semantics.
+     * @method $notify
+     * @returns {CallbackOptionsHandler} notification semanics.
+     * @for Handler
+     */
+    $notify() {
+      return this.$callOptions(CallbackOptions.Notify);
+    },
+
+    /**
+     * Establishes callback semantics.
+     * @method $callOptions
+     * @param  {CallbackOptions}  options  -  callback semantics
+     * @returns {Handler} custom callback semanics.
+     * @for Handler
+     */
+    $callOptions(options) {
+      var semantics = new CallbackSemantics(options);
+      return this.$decorate({
+        handleCallback(callback, greedy, composer) {
+          if (Composition.isComposed(callback, CallbackSemantics)) {
+            return false;
+          }
+
+          if (callback instanceof CallbackSemantics) {
+            semantics.mergeInto(callback);
+
+            if (greedy) {
+              this.base(callback, greedy, composer);
+            }
+
+            return true;
+          } else if (callback instanceof Composition) {
+            return this.base(callback, greedy, composer);
+          }
+
+          if (semantics.isSpecified(CallbackOptions.Greedy)) {
+            greedy = semantics.hasOption(CallbackOptions.Greedy);
+          }
+
+          if (semantics.isSpecified(CallbackOptions.BestEffort) && semantics.hasOption(CallbackOptions.BestEffort)) {
+            try {
+              this.base(callback, greedy, composer);
+              return true;
+            } catch (exception) {
+              if (exception instanceof NotHandledError || exception instanceof RejectedError) {
+                return true;
+              }
+
+              throw exception;
+            }
+          }
+
+          return this.base(callback, greedy, composer);
+        }
+
+      });
+    }
+
+  });
+
+  var _class$l;
+  /**
+   * Represents a two-way
+   * {{#crossLink "Handler"}}{{/crossLink}} path.
+   * @class CascadeHandler
+   * @constructor
+   * @param  {Handler}  handler           -  primary handler
+   * @param  {Handler}  cascadeToHandler  -  secondary handler
+   * @extends Handler
+   */
+
+  var CascadeHandler = unmanaged(_class$l = class CascadeHandler extends Handler {
+    constructor(handler, cascadeToHandler) {
+      if ($isNothing(handler)) {
+        throw new TypeError("No handler specified.");
+      } else if ($isNothing(cascadeToHandler)) {
+        throw new TypeError("No cascadeToHandler specified.");
+      }
+
+      super();
+      Object.defineProperties(this, {
+        handler: {
+          value: Handler.for(handler),
+          writable: false
+        },
+        cascadeToHandler: {
+          value: Handler.for(cascadeToHandler),
+          writable: false
+        }
+      });
+    }
+
+    handleCallback(callback, greedy, composer) {
+      var handled = super.handleCallback(callback, greedy, composer);
+      return !!(greedy ? handled | (this.handler.handle(callback, true, composer) | this.cascadeToHandler.handle(callback, true, composer)) : handled || this.handler.handle(callback, false, composer) || this.cascadeToHandler.handle(callback, false, composer));
+    }
+
+  }) || _class$l;
+
+  var _dec$i, _class$m;
+
+  var _$t = createKeyChain();
+  /**
+   * Callback representing the covariant creation of a type.
+   * @class Creation
+   * @constructor
+   * @param   {Object}   callback  -  callback
+   * @param   {boolean}  many      -  creation cardinality
+   * @extends Base
+   */
+
+
+  var Creation = (_dec$i = conformsTo(CallbackControl), _dec$i(_class$m = class Creation extends exports.Base {
+    constructor(type, many) {
+      if ($isNothing(type)) {
+        throw new TypeError("The type argument is required.");
+      }
+
+      super();
+
+      var _this = _$t(this);
+
+      _this.type = type;
+      _this.many = !!many;
+      _this.instances = [];
+      _this.promises = [];
+    }
+
+    get isMany() {
+      return _$t(this).many;
+    }
+
+    get type() {
+      return _$t(this).type;
+    }
+
+    get instances() {
+      return _$t(this).instances;
+    }
+
+    get callbackPolicy() {
+      return creates.policy;
+    }
+
+    get callbackResult() {
+      var {
+        result,
+        instances,
+        promises
+      } = _$t(this);
+
+      if (result === undefined) {
+        if (promises.length == 0) {
+          _$t(this).result = result = this.isMany ? instances : instances[0];
+        } else {
+          _$t(this).result = result = this.isMany ? Promise.all(promises).then(() => instances) : Promise.all(promises).then(() => instances[0]);
+        }
+      }
+
+      return result;
+    }
+
+    set callbackResult(value) {
+      _$t(this).result = value;
+    }
+
+    addInstance(instance) {
+      if ($isNothing(instance)) return;
+
+      if ($isPromise(instance)) {
+        _$t(this).promises.push(instance.then(res => {
+          if (res != null) {
+            _$t(this).instances.push(res);
+          }
+        }));
+      } else {
+        _$t(this).instances.push(instance);
+      }
+
+      delete _$t(this).result;
+    }
+
+    dispatch(handler, greedy, composer) {
+      var count = _$t(this).instances.length;
+
+      return creates.dispatch(handler, this, this, this.type, composer, this.isMany, this.addInstance.bind(this)) || _$t(this).instances.length > count;
+    }
+
+    toString() {
+      return `Creation ${this.isMany ? "many " : ""}| ${this.type}`;
+    }
+
+  }) || _class$m);
+
+  var HandleResult = Enum(HandleResult => ({
+    Handled: HandleResult(true, false),
+    HandledAndStop: HandleResult(true, true),
+    NotHandled: HandleResult(false, false),
+    NotHandledAndStop: HandleResult(false, true)
+  }), {
+    constructor(handled, stop) {
+      this.extend({
+        get handled() {
+          return handled;
+        },
+
+        get stop() {
+          return stop;
+        }
+
+      });
+    },
+
+    next(condition, block) {
+      var stop = this.stop;
+
+      if (block == null) {
+        block = condition;
+      } else {
+        stop = stop || !condition;
+      }
+
+      return stop || !$isFunction(block) ? this : mapResult(block, this);
+    },
+
+    success(block) {
+      if (this.handled && $isFunction(block)) {
+        return block.call(this);
+      }
+    },
+
+    failure(block) {
+      if (!this.handled && $isFunction(block)) {
+        return block.call(this);
+      }
+    },
+
+    otherwise(condition, block) {
+      if ($isFunction(block)) {
+        return (this.handled || this.stop) && !condition ? this : mapResult(block, this);
+      } else if ($isFunction(condition)) {
+        return this.handled || this.stop ? this : mapResult(condition, this);
+      } else if (condition || this.handled) {
+        return this.stop ? HandleResult.HandledAndStop : HandleResult.Handled;
+      } else {
+        return this.stop ? HandleResult.NotHandledAndStop : HandleResult.NotHandled;
+      }
+    },
+
+    or(other) {
+      if (!(other instanceof HandleResult)) {
+        return this;
+      } else if (this.handled || other.handled) {
+        return this.stop || other.stop ? HandleResult.HandledAndStop : HandleResult.Handled;
+      } else {
+        return this.stop || other.stop ? HandleResult.NotHandledAndStop : HandleResult.NotHandled;
+      }
+    },
+
+    and(other) {
+      if (!(other instanceof HandleResult)) {
+        return this;
+      } else if (this.handled && other.handled) {
+        return this.stop || other.stop ? HandleResult.HandledAndStop : HandleResult.Handled;
+      } else {
+        return this.stop || other.stop ? HandleResult.NotHandledAndStop : HandleResult.NotHandled;
+      }
+    },
+
+    toString() {
+      return `HandleResult | ${this.handled ? "handled" : "not handled"} ${this.stop ? " and stop" : ""}`;
+    }
+
+  });
+
+  function mapResult(block, handleResult) {
+    var result = block.call(handleResult);
+    return result instanceof HandleResult ? result : result ? HandleResult.Handled : HandleResult.NotHandled;
+  }
+
+  var _dec$j, _class$n;
+
+  var _$u = createKeyChain(),
+      defaultKeyResolver$1 = new KeyResolver(),
+      globalFilters = new FilteredScope();
+  /**
+   * Invokes a method on a target.
+   * @class HandleMethod
+   * @constructor
+   * @param  {number}              methodType  -  get, set or invoke
+   * @param  {Protocol}            protocol    -  initiating protocol
+   * @param  {string}              methodName  -  method name
+   * @param  {Any}                 args        -  method or property arguments
+   * @param  {InvocationSemanics}  semantics   -  invocation semantics
+   * @extends Base
+   */
+
+
+  var HandleMethod = (_dec$j = conformsTo(CallbackControl), _dec$j(_class$n = class HandleMethod extends exports.Base {
+    constructor(methodType, protocol, methodName, args, semantics) {
+      if ($isNothing(methodName)) {
+        throw new Error("The methodName argument is required");
+      }
+
+      if (protocol && !$isProtocol(protocol)) {
+        throw new TypeError("Invalid protocol supplied.");
+      }
+
+      super();
+
+      var _this = _$u(this);
+
+      _this.methodType = methodType;
+      _this.protocol = protocol;
+      _this.methodName = methodName;
+      _this.args = args;
+      _this.semantics = semantics || new CallbackSemantics();
+    }
+
+    get methodType() {
+      return _$u(this).methodType;
+    }
+
+    get protocol() {
+      return _$u(this).protocol;
+    }
+
+    get semantics() {
+      return _$u(this).semantics;
+    }
+
+    get methodName() {
+      return _$u(this).methodName;
+    }
+
+    get args() {
+      return _$u(this).args;
+    }
+
+    set args(value) {
+      _$u(this).args = value;
+    }
+
+    get returnValue() {
+      return _$u(this).returnValue;
+    }
+
+    set returnValue(value) {
+      _$u(this).returnValue = value;
+    }
+
+    get exception() {
+      return _$u(this).exception;
+    }
+
+    set exception(exception) {
+      _$u(this).exception = exception;
+    }
+
+    get callbackResult() {
+      return _$u(this).returnValue;
+    }
+
+    set callbackResult(value) {
+      _$u(this).returnValue = value;
+    }
+
+    inferCallback() {
+      return new HandleMethodInference(this);
+    }
+    /**
+     * Attempts to invoke the method on the target.<br/>
+     * During invocation, the receiver will have access to the ambient **$composer** property
+     * representing the initiating {{#crossLink "Handler"}}{{/crossLink}}.
+     * @method invokeOn
+     * @param   {Object}   target    -  method receiver
+     * @param   {Handler}  composer  -  composition handler
+     * @returns {boolean} true if the method was accepted.
+     */
+
+
+    invokeOn(target, composer) {
+      if (!this.isAcceptableTarget(target)) return false;
+      var method;
+      var {
+        methodName,
+        methodType,
+        args
+      } = this;
+
+      if (methodType === MethodType.Invoke) {
+        method = target[methodName];
+        if (!$isFunction(method)) return false;
+      }
+
+      var filters, binding;
+
+      if (!$isNothing(composer)) {
+        var owner = HandlerDescriptor.get(target, true);
+        binding = Binding.create(HandleMethod, target, null, methodName);
+        filters = composer.$getOrderedFilters(binding, this, [binding.getMetadata(filter), owner, HandleMethod.globalFilters]);
+        if ($isNothing(filters)) return false;
+      }
+
+      var action,
+          completed = true;
+
+      try {
+        switch (methodType) {
+          case MethodType.Get:
+            action = composer != null ? () => composer.$compose(() => target[methodName]) : () => target[methodName];
+            break;
+
+          case MethodType.Set:
+            action = composer != null ? () => composer.$compose(() => target[methodName] = args) : () => target[methodName] = args;
+            break;
+
+          case MethodType.Invoke:
+            action = composer != null ? () => composer.$compose(() => method.apply(target, args)) : () => method.apply(target, args);
+            break;
+        }
+
+        var result = $isNothing(filters) || filters.length == 0 ? action() : filters.reduceRight((next, pipeline) => (comp, proceed) => {
+          if (proceed) {
+            var _filter = pipeline.filter,
+                signature = design.get(_filter, "next"),
+                _args = resolveArgs$1.call(this, signature, comp);
+
+            if (!$isNothing(_args)) {
+              var provider = pipeline.provider,
+                  context = {
+                binding,
+                rawCallback: this,
+                provider,
+                composer: comp,
+                next: (c, p) => next(c != null ? c : comp, p != null ? p : true),
+                abort: () => next(null, false)
+              };
+              return $isPromise(_args) ? _args.then(a => _filter.next(...a, context)) : _filter.next(..._args, context);
+            }
+          }
+
+          completed = false;
+        }, (comp, proceed) => {
+          if (proceed) return action();
+          completed = false;
+        })(composer, true);
+
+        if (!completed || result === $unhandled) {
+          return false;
+        }
+
+        _$u(this).returnValue = result;
+        return true;
+      } catch (exception) {
+        _$u(this).exception = exception;
+        throw exception;
+      }
+    }
+
+    isAcceptableTarget(target) {
+      if ($isNothing(target)) return false;
+      if ($isNothing(this.protocol)) return true;
+      return this.semantics.hasOption(CallbackOptions.Strict) ? this.protocol.isToplevel(target) : this.semantics.hasOption(CallbackOptions.Duck) || this.protocol.isAdoptedBy(target);
+    }
+
+    notHandledError() {
+      var qualifier = "";
+
+      switch (this.methodType) {
+        case MethodType.Get:
+          qualifier = " (get)";
+          break;
+
+        case MethodType.Set:
+          qualifier = " (set)";
+          break;
+      }
+
+      return new TypeError(`Protocol ${this.protocol.name}:${this.methodName}${qualifier} could not be handled.`);
+    }
+
+    dispatch(handler, greedy, composer) {
+      return this.invokeOn(handler, composer);
+    }
+
+    toString() {
+      return `HandleMethod | ${this.methodName}`;
+    }
+
+    static get globalFilters() {
+      return globalFilters;
+    }
+
+  }) || _class$n);
+
+  class HandleMethodInference extends Trampoline {
+    constructor(handleMethod) {
+      super(handleMethod);
+      _$u(this).resolving = new Resolving(handleMethod.protocol, handleMethod);
+    }
+
+    get callbackResult() {
+      var result = _$u(this).resolving.callbackResult;
+
+      if ($isPromise(result)) {
+        return result.then(() => {
+          if (_$u(this).resolving.succeeded) {
+            return this.callback.callbackResult;
+          }
+
+          throw new NotHandledError(this.callback);
+        });
+      }
+
+      return this.callback.callbackResult;
+    }
+
+    set callbackResult(value) {
+      super.callbackResult = value;
+    }
+
+    dispatch(handler, greedy, composer) {
+      return super.dispatch(handler, greedy, composer) || _$u(this).resolving.dispatch(handler, greedy, composer);
+    }
+
+  }
+
+  function resolveArgs$1(signature, composer) {
+    var _this2 = this;
+
+    if ($isNothing(signature)) {
+      return [this];
+    }
+
+    var {
+      args
+    } = signature;
+
+    if ($isNothing(args) || args.length === 0) {
+      return [this];
+    }
+
+    var resolved = [],
+        promises = [];
+
+    var _loop = function (i) {
+      var arg = args[i];
+
+      if ($isNothing(arg)) {
+        if (i === 0) {
+          resolved[0] = _this2;
+        }
+
+        return "continue";
+      }
+
+      if (i === 0 && $isNothing(arg.keyResolver)) {
+        if (arg.validate(_this2)) {
+          resolved[0] = _this2;
+          return "continue";
+        }
+      }
+
+      var resolver = arg.keyResolver || defaultKeyResolver$1,
+          validate = resolver.validate;
+
+      if ($isFunction(validate)) {
+        validate.call(resolver, arg);
+      }
+
+      var dep = resolver.resolve(arg, composer);
+      if ($isNothing(dep)) return {
+        v: null
+      };
+
+      if ($optional.test(dep)) {
+        resolved[i] = $contents(dep);
+      } else if ($isPromise(dep)) {
+        promises.push(dep.then(result => resolved[i] = result));
+      } else {
+        resolved[i] = dep;
+      }
+    };
+
+    for (var i = 0; i < args.length; ++i) {
+      var _ret = _loop(i);
+
+      if (_ret === "continue") continue;
+      if (typeof _ret === "object") return _ret.v;
+    }
+
+    if (promises.length === 0) {
+      return resolved;
+    }
+
+    if (promises.length === 1) {
+      return promises[0].then(() => resolved);
+    }
+
+    return Promise.all(promises).then(() => resolved);
+  }
+
+  Handler.implement({
+    /**
+     * Prepares the Handler for batching.
+     * @method $batch
+     * @param   {Any}  [...tags]  -  tags to batch
+     * @returns {Handler}  batching callback handler.
+     * @for Handler
+     */
+    $batch(...args) {
+      var _dec, _obj;
+
+      args = $flatten(args);
+
+      if (args.length === 0) {
+        throw new Error("Missing $batch block function.");
+      }
+
+      var block = args.pop();
+
+      if (!$isFunction(block)) {
+        throw new TypeError("The $batch block must be a function.");
+      }
+
+      var _batch = new Batch(...args),
+          _complete = false;
+
+      var batcher = this.$decorate((_dec = provides(Batching), (_obj = {
+        getBatcher(inquiry) {
+          if (!$isNothing(_batch)) {
+            var _batcher = _batch.resolve(inquiry.key);
+
+            if ($isNothing(_batcher)) {
+              _batcher = Reflect.construct(inquiry.key, []);
+
+              _batch.addHandlers(_batcher);
+            }
+
+            return _batcher;
+          }
+        },
+
+        handleCallback(callback, greedy, composer) {
+          if (_batch && callback.canBatch !== false) {
+            var b = _batch;
+
+            if (_complete && !(callback instanceof Composition)) {
+              _batch = null;
+            }
+
+            if (b.handle(callback, greedy, composer)) {
+              return true;
+            }
+          }
+
+          return this.base(callback, greedy, composer);
+        }
+
+      }, (_applyDecoratedDescriptor(_obj, "getBatcher", [_dec], Object.getOwnPropertyDescriptor(_obj, "getBatcher"), _obj)), _obj)));
+      var promise = block(batcher);
+      _complete = true;
+      var results = BatchingComplete(batcher).complete(batcher);
+
+      if ($isPromise(promise)) {
+        return $isPromise(results) ? results.then(res => promise.then(() => res)) : promise.then(() => results);
+      }
+
+      return results;
+    },
+
+    $noBatch() {
+      return this.$decorate({
+        handleCallback(callback, greedy, composer) {
+          var _inquiry;
+
+          var inquiry;
+
+          if (callback instanceof Inquiry) {
+            inquiry = callback;
+          } else if (Composition.isComposed(callback, Inquiry)) {
+            inquiry = callback.callback;
+          }
+
+          return ((_inquiry = inquiry) == null ? void 0 : _inquiry.key) !== Batch && this.base(new NoBatch(callback), greedy, composer);
+        }
+
+      });
+    },
+
+    $getBatch(tag) {
+      var batch = this.resolve(Batch);
+
+      if (!$isNothing(batch) && ($isNothing(tag) || batch.shouldBatch(tag))) {
+        return batch;
+      }
+    },
+
+    $getBatcher(batcherType, tag) {
+      if (!Batching.isAdoptedBy(batcherType)) {
+        throw new TypeError(`Batcher ${batcherType.name} does not conform to Batching protocol.`);
+      }
+
+      var batch = this.resolve(Batch);
+      if ($isNothing(batch)) return;
+      var batcher = batch.resolve(batcherType);
+
+      if ($isNothing(batcher)) {
+        batcher = Reflect.construct(batcherType, []);
+        batch.addHandlers(batcher);
+      }
+
+      return batcher;
+    }
+
+  });
+
+  var _dec$k, _class$o;
+
+  var _$v = createKey();
+
+  class Options extends exports.Base {
+    get canBatch() {
+      return false;
+    }
+
+    get canFilter() {
+      return false;
+    }
+
+    get canInfer() {
+      return false;
+    }
+    /**
+     * Merges this options data into `options`.
+     * @method mergeInto
+     * @param   {Options}  options  -  options to receive data
+     * @returns {boolean} true if options could be merged into.
+     */
+
+
+    mergeInto(options) {
+      if (!(options instanceof this.constructor)) {
+        return false;
+      }
+
+      var descriptors = getPropertyDescriptors(this),
+          keys = Reflect.ownKeys(descriptors);
+      keys.forEach(key => {
+        if (Reflect.has(Options.prototype, key)) return;
+        var keyValue = this[key],
+            descriptor = descriptors[key];
+
+        if (keyValue !== undefined) {
+          var optionsValue = options[key];
+
+          if (optionsValue === undefined || !options.hasOwnProperty(key)) {
+            options[key] = copyOptionsValue(keyValue);
+          } else if (!$isNothing(keyValue)) {
+            this.mergeKeyInto(options, key, keyValue, optionsValue);
+          }
+        }
+      });
+      return true;
+    }
+
+    mergeKeyInto(options, key, keyValue, optionsValue) {
+      if (Array.isArray(keyValue)) {
+        options[key] = options[key].concat(copyOptionsValue(keyValue));
+        return;
+      }
+
+      var mergeInto = keyValue.mergeInto;
+
+      if ($isFunction(mergeInto)) {
+        mergeInto.call(keyValue, optionsValue);
+      }
+    }
+
+    copy() {
+      var options = Reflect.construct(this.constructor, emptyArray);
+      this.mergeInto(options);
+      return options;
+    }
+
+  }
+
+  function copyOptionsValue(optionsValue) {
+    if ($isNothing(optionsValue)) {
+      return optionsValue;
+    }
+
+    if (Array.isArray(optionsValue)) {
+      return optionsValue.map(copyOptionsValue);
+    }
+
+    if ($isFunction(optionsValue.copy)) {
+      return optionsValue.copy();
+    }
+
+    return optionsValue;
+  }
+
+  var OptionsResolver = (_dec$k = conformsTo(KeyResolving), _dec$k(_class$o = class OptionsResolver {
+    constructor(optionsType) {
+      _$v(this).optionsType = optionsType;
+    }
+
+    validate(typeInfo) {
+      var optionsType = _$v(this).optionsType || typeInfo.type;
+
+      if ($isNothing(optionsType)) {
+        throw new TypeError("Unable to determine @options argument type.");
+      }
+
+      if (!(optionsType.prototype instanceof Options)) {
+        throw new TypeError(`@options requires an Options argument, but found '${optionsType.name}'.`);
+      }
+    }
+
+    resolve(typeInfo, handler) {
+      var optionsType = _$v(this).optionsType || typeInfo.type,
+          options = handler.$getOptions(optionsType);
+      return $isNothing(options) ? $optional(options) : options;
+    }
+
+  }) || _class$o);
+  var options = createTypeInfoDecorator((key, typeInfo, [optionsType]) => {
+    typeInfo.keyResolver = new OptionsResolver(optionsType);
+  });
+
+  /**
+   * Register the options to be applied by a Handler.
+   * @method registerOptions
+   * @static
+   * @param   {Function}        optionsType  -  type of options
+   * @param   {string|symbol}   optionsKey   -  options key  
+   * @returns {boolean} true if successful, false otherwise.
+   * @for Handler
+   */
+
+  Handler.registerOptions = function (optionsType, optionsKey) {
+    validateOptionsType(optionsType);
+
+    if ($isNothing(optionsKey)) {
+      throw new TypeError("The Options key is required.");
+    }
+
+    var actualKey = optionsKey.startsWith("$") ? optionsKey : `$${optionsKey}`;
+
+    if (Handler.prototype.hasOwnProperty(actualKey)) {
+      throw new Error(`Options key '${optionsKey}' is already defined.`);
+    }
+
+    Handler.implement({
+      [actualKey](options) {
+        if ($isNothing(options)) return this;
+
+        if (!(options instanceof optionsType)) {
+          options = Reflect.construct(optionsType, emptyArray).extend(options);
+        }
+
+        return this.$withOptions(options);
+      }
+
+    });
+    return true;
+  };
+
+  Handler.implement({
+    $withOptions(options) {
+      if ($isNothing(options)) return this;
+      var optionsType = $classOf(options);
+      validateOptionsType(optionsType);
+      return this.$decorate({
+        handleCallback(callback, greedy, composer) {
+          var fillOpttions = callback;
+
+          if (callback instanceof Composition) {
+            fillOpttions = callback.callback;
+          }
+
+          if (fillOpttions instanceof optionsType) {
+            options.mergeInto(fillOpttions);
+
+            if (greedy) {
+              this.base(callback, greedy, composer);
+            }
+
+            return true;
+          }
+
+          return this.base(callback, greedy, composer);
+        }
+
+      });
+      /* Alternatives
+      -- Explicit decoration for Babel Symbol bug
+      const method  = Symbol(),
+            handler = { [method] (receiver) { 
+                options.mergeInto(receiver);
+            } };
+      Object.defineProperty(handler, method,
+          Reflect.decorate([handles(optionsType)], handler, method,
+              Object.getOwnPropertyDescriptor(handler, method)));
+      return this.$decorate(handler);
+       -- Babel decorator bug for Symbol defined methods
+      return this.$decorate({
+          @handles(optionsType)
+          [Symbol()](receiver) {
+              options.mergeInto(receiver);         
+          }
+      });
+      */
+    },
+
+    $getOptions(optionsType) {
+      validateOptionsType(optionsType);
+      var options = new optionsType();
+      return this.handle(options, true) ? options : null;
+    }
+
+  });
+  function handlesOptions(optionsKey) {
+    if ($isFunction(optionsKey)) {
+      throw new SyntaxError("@handlesOptions requires an options key argument");
+    }
+
+    return (target, key, descriptor) => {
+      if ($isNothing(descriptor)) {
+        Handler.registerOptions(target, optionsKey);
+      } else {
+        throw new SyntaxError("@handlesOptions can only be applied to classes.");
+      }
+    };
+  }
+
+  function validateOptionsType(optionsType) {
+    if ($isNothing(optionsType)) {
+      throw new Error("The options type is required.");
+    }
+
+    if (!$isFunction(optionsType) || !(optionsType.prototype instanceof Options)) {
+      throw new TypeError(`The options type '${optionsType}' does not extend Options.`);
+    }
+  }
+
+  var _dec$l, _class$p;
+
+  var _$w = createKeyChain();
+  /**
+   * Callback representing the invariant lookup of a key.
+   * @class Lookup
+   * @constructor
+   * @param   {Any}      key   -  lookup key
+   * @param   {boolean}  many  -  lookup cardinality
+   * @extends Base
+   */
+
+
+  var Lookup = (_dec$l = conformsTo(CallbackControl), _dec$l(_class$p = class Lookup extends exports.Base {
+    constructor(key, many) {
+      if ($isNothing(key)) {
+        throw new Error("The key argument is required.");
+      }
+
+      super();
+
+      var _this = _$w(this);
+
+      _this.key = key;
+      _this.many = !!many;
+      _this.results = [];
+      _this.promises = [];
+      _this.instant = $instant.test(key);
+    }
+
+    get key() {
+      return _$w(this).key;
+    }
+
+    get isMany() {
+      return _$w(this).many;
+    }
+
+    get results() {
+      return _$w(this).results;
+    }
+
+    get callbackPolicy() {
+      return lookups.policy;
+    }
+
+    get callbackResult() {
+      if (_$w(this).result === undefined) {
+        var results = this.results,
+            promises = _$w(this).promises;
+
+        if (promises.length == 0) {
+          _$w(this).result = this.isMany ? results : results[0];
+        } else {
+          _$w(this).result = this.isMany ? Promise.all(promises).then(() => results) : Promise.all(promises).then(() => results[0]);
+        }
+      }
+
+      return _$w(this).result;
+    }
+
+    set callbackResult(value) {
+      _$w(this).result = value;
+    }
+
+    addResult(result, composer) {
+      var found;
+      if ($isNothing(result)) return false;
+
+      if (Array.isArray(result)) {
+        found = $flatten(result, true).reduce((s, r) => include$1.call(this, r, composer) || s, false);
+      } else {
+        found = include$1.call(this, result, composer);
+      }
+
+      if (found) {
+        delete _$w(this).result;
+      }
+
+      return found;
+    }
+
+    dispatch(handler, greedy, composer) {
+      var results = this.results,
+          promises = _$w(this).promises,
+          count = results.length + promises.length,
+          found = looksup.dispatch(handler, this, this, this.key, composer, this.isMany, this.addResult.bind(this));
+
+      return found || results.length + promises.length > count;
+    }
+
+    toString() {
+      return `Lookup ${this.isMany ? "many " : ""}| ${this.key}`;
+    }
+
+  }) || _class$p);
+
+  function include$1(result, composer) {
+    if ($isNothing(result)) return false;
+
+    if ($isPromise(result)) {
+      if (_$w(this).instant) return false;
+      var results = this.results;
+
+      _$w(this).promises.push(result.then(res => {
+        if (Array.isArray(res)) {
+          results.push(...res.filter(r => r != null));
+        } else if (res != null) {
+          results.push(res);
+        }
+      }).catch(Undefined$1));
+    } else {
+      _$w(this).results.push(result);
+    }
+
+    return true;
+  }
+
+  var _$x = createKey();
+
+  class NamedConstraint extends BindingConstraint {
+    constructor(name) {
+      super();
+
+      if (!name) {
+        throw new Error("The name cannot be empty.");
+      }
+
+      _$x(this).name = name;
+    }
+
+    get name() {
+      return _$x(this).name;
+    }
+
+    require(metadata) {
+      if ($isNothing(metadata)) {
+        throw new Error("The metadata argument is required.");
+      }
+
+      metadata.name = _$x(this).name;
+    }
+
+    matches(metadata) {
+      if ($isNothing(metadata)) {
+        throw new Error("The metadata argument is required.");
+      }
+
+      var name = metadata.name;
+      return $isNothing(name) || this.name == name;
+    }
+
+  }
+  var named = createConstraintDecorator(name => new NamedConstraint(name));
+
+  var _$y = createKey();
+
+  class ConstraintBuilder {
+    constructor(metadata) {
+      if ($isNothing(metadata)) {
+        metadata = new BindingMetadata();
+      } else if (!(metadata instanceof BindingMetadata)) {
+        if (metadata.metadata instanceof BindingMetadata) {
+          metadata = metadata.metadata;
+        }
+      }
+
+      if ($isNothing(metadata)) {
+        throw new TypeError("The metadata argument must be a BindingMetadata or BindingSource.");
+      }
+
+      _$y(this).metadata = metadata;
+    }
+
+    named(name) {
+      return this.require(new NamedConstraint(name));
+    }
+
+    require(...args) {
+      var metadata = _$y(this).metadata;
+
+      if (args.length === 2 && $isString$1(args[0])) {
+        metadata.set(args[0], args[1]);
+        return this;
+      }
+
+      if (args.length === 1) {
+        var arg = args[0];
+
+        if (arg instanceof BindingMetadata) {
+          if (!$isNothing(arg.name)) {
+            metadata.name = arg.name;
+          }
+
+          arg.mergeInto(metadata);
+          return this;
+        }
+
+        if (arg instanceof BindingConstraint) {
+          arg.require(metadata);
+
+          return this;
+        }
+
+        if ($isFunction(arg)) {
+          var constranint = arg();
+
+          if (constranint instanceof BindingConstraint) {
+            constranint.require(metadata);
+
+            return this;
+          }
+        }
+      }
+
+      throw new Error("require expects a key/value, BindingMetadata, BindingConstraint or constraint decorator.");
+    }
+
+    build() {
+      return _$y(this).metadata;
+    }
+
+  }
+
+  var defaultKeyResolver$2 = new KeyResolver();
+  Handler.implement({
+    /**
+     * Handles the callback.
+     * @method $command
+     * @param   {Object}  callback  -  callback
+     * @returns {Any} optional result
+     * @for Handler
+     */
+    $command(callback) {
+      var command = new Command(callback);
+
+      if (!this.handle(command, false)) {
+        throw new NotHandledError(callback);
+      }
+
+      return command.callbackResult;
+    },
+
+    /**
+     * Handles the callback greedily.
+     * @method $commandAll
+     * @param   {Object}  callback  -  callback
+     * @returns {Any} optional results.
+     * @for Handler
+     */
+    $commandAll(callback) {
+      var command = new Command(callback, true);
+
+      if (!this.handle(command, true)) {
+        throw new NotHandledError(callback);
+      }
+
+      return command.callbackResult;
+    },
+
+    /**
+     * Resolves the key.
+     * @method resolve
+     * @param   {Any}       key            -  key
+     * @param   {Function}  [constraints]  -  optional constraints
+     * @returns {Any}  resolved key.  Could be a promise.
+     * @for Handler
+     * @async
+     */
+    resolve(key, constraints) {
+      var inquiry;
+
+      if (key instanceof Inquiry) {
+        if (key.isMany) {
+          throw new Error("Requested Inquiry expects multiple results.");
+        }
+
+        inquiry = key;
+      } else {
+        inquiry = new Inquiry(key);
+      }
+
+      constraints == null ? void 0 : constraints(new ConstraintBuilder(inquiry));
+
+      if (this.handle(inquiry, false)) {
+        return inquiry.callbackResult;
+      }
+    },
+
+    /**
+     * Resolves the key greedily.
+     * @method resolveAll
+     * @param   {Any}       key            -  key
+     * @param   {Function}  [constraints]  -  optional constraints
+     * @returns {Array} resolved key.  Could be a promise.
+     * @for Handler
+     * @async
+     */
+    resolveAll(key, constraints) {
+      var inquiry;
+
+      if (key instanceof Inquiry) {
+        if (!key.isMany) {
+          throw new Error("Requested Inquiry expects a single result.");
+        }
+
+        inquiry = key;
+      } else {
+        inquiry = new Inquiry(key, true);
+      }
+
+      constraints == null ? void 0 : constraints(new ConstraintBuilder(inquiry));
+      return this.handle(inquiry, true) ? inquiry.callbackResult : [];
+    },
+
+    /**
+     * Looks up the key.
+     * @method $lookup
+     * @param   {Any}  key  -  key
+     * @returns {Any}  value of key.
+     * @for Handler
+     */
+    $lookup(key) {
+      var lookup;
+
+      if (key instanceof Lookup) {
+        if (key.isMany) {
+          throw new Error("Requested Lookup expects multiple results.");
+        }
+
+        lookup = key;
+      } else {
+        lookup = new Lookup(key);
+      }
+
+      if (this.handle(lookup, false)) {
+        return lookup.callbackResult;
+      }
+    },
+
+    /**
+     * Looks up the key greedily.
+     * @method $lookupAll
+     * @param   {Any}  key  -  key
+     * @returns {Array}  value(s) of key.
+     * @for Handler
+     */
+    $lookupAll(key) {
+      var lookup;
+
+      if (key instanceof Lookup) {
+        if (!key.isMany) {
+          throw new Error("Requested Lookup expects a single result.");
+        }
+
+        lookup = key;
+      } else {
+        lookup = new Lookup(key, true);
+      }
+
+      return this.handle(lookup, true) ? lookup.callbackResult : [];
+    },
+
+    /**
+     * Creates an instance of the `type`.
+     * @method $create
+     * @param   {Function}  type  -  type
+     * @returns {Any} instance of the type.
+     * @for Handler
+     */
+    $create(type) {
+      var creation = new Creation(type);
+
+      if (!this.handle(creation, false)) {
+        throw new NotHandledError(creation);
+      }
+
+      return creation.callbackResult;
+    },
+
+    /**
+     * Creates instances of the `type`.
+     * @method $createAll
+     * @param   {Function}  type  -  type
+     * @returns {Any} instances of the type.
+     * @for Handler
+     */
+    $createAll(type) {
+      var creation = new Creation(type, true);
+
+      if (!this.handle(creation, true)) {
+        throw new NotHandledError(creation);
+      }
+
+      return creation.callbackResult;
+    },
+
+    /**
+     * Decorates the handler.
+     * @method $decorate
+     * @param   {Object}  decorations  -  decorations
+     * @returns {Handler} decorated callback handler.
+     * @for Handler
+     */
+    $decorate(decorations) {
+      return $decorate(this, decorations);
+    },
+
+    /**
+     * Decorates the handler for filtering callbacks.
+     * @method $filter
+     * @param   {Function}  filter     -  filter
+     * @param   {boolean}   reentrant  -  true if reentrant, false otherwise
+     * @returns {Handler} filtered callback handler.
+     * @for Handler
+     */
+    $filter(filter, reentrant) {
+      if (!$isFunction(filter)) {
+        throw new TypeError(`Invalid filter: ${filter} is not a function.`);
+      }
+
+      return this.$decorate({
+        handleCallback(callback, greedy, composer) {
+          if (!reentrant && callback instanceof Composition) {
+            return this.base(callback, greedy, composer);
+          }
+
+          var base = this.base;
+          return filter(callback, composer, () => base.call(this, callback, greedy, composer));
+        }
+
+      });
+    },
+
+    /**
+     * Accepts a callback explicitly.
+     * @method $accepts
+     * @param   {Any}       constraint  -  callback constraint
+     * @param   {Function}  handler     -  callback handler
+     * @returns {Handler} callback handler.
+     * @for Handler
+     */
+    $accepts(constraint, handler) {
+      handles.addHandler(this, constraint, handler);
+      return this;
+    },
+
+    /**
+     * Providesa callback explicitly.
+     * @method $provides
+     * @param  {Any}       constraint  -  callback constraint
+     * @param  {Function}  provider    -  callback provider
+     * @returns {Handler} callback provider.
+     * @for Handler
+     */
+    $provides(constraint, provider) {
+      provides.addHandler(this, constraint, provider);
+      return this;
+    },
+
+    /**
+     * Decorates the handler for applying aspects to callbacks.
+     * @method $aspect
+     * @param   {Function}  before     -  before action.  Return false to reject
+     * @param   {Function}  action     -  after action
+     * @param   {boolean}   reentrant  -  true if reentrant, false otherwise
+     * @returns {Handler}  callback handler aspect.
+     * @throws  {RejectedError} An error if before returns an unaccepted promise.
+     * @for Handler
+     */
+    $aspect(before, after, reentrant) {
+      return this.$filter((callback, composer, proceed) => {
+        if ($isFunction(before)) {
+          var test = before(callback, composer);
+
+          if ($isPromise(test)) {
+            var hasResult = ("callbackResult" in callback),
+                accept = test.then(accepted => {
+              if (accepted !== false) {
+                aspectProceed(callback, composer, proceed, after, accepted);
+                return hasResult ? callback.callbackResult : true;
+              }
+
+              return Promise.reject(new RejectedError(callback));
+            });
+
+            if (hasResult) {
+              callback.callbackResult = accept;
+            }
+
+            return true;
+          } else if (test === false) {
+            throw new RejectedError(callback);
+          }
+        }
+
+        return aspectProceed(callback, composer, proceed, after);
+      }, reentrant);
+    },
+
+    $resolveArgs(args) {
+      var _this = this;
+
+      if ($isNothing(args) || args.length === 0) {
+        return [];
+      }
+
+      var resolved = [],
+          promises = [];
+
+      var _loop = function (i) {
+        var arg = args[i];
+        if ($isNothing(arg)) return "continue";
+        var resolver = arg.keyResolver || defaultKeyResolver$2,
+            validate = resolver.validate;
+
+        if ($isFunction(validate)) {
+          validate.call(resolver, arg);
+        }
+
+        var dep = resolver.resolve(arg, _this);
+        if ($isNothing(dep)) return {
+          v: null
+        };
+
+        if ($optional.test(dep)) {
+          resolved[i] = $contents(dep);
+        } else if ($isPromise(dep)) {
+          promises.push(dep.then(result => resolved[i] = result));
+        } else {
+          resolved[i] = dep;
+        }
+      };
+
+      for (var i = 0; i < args.length; ++i) {
+        var _ret = _loop(i);
+
+        if (_ret === "continue") continue;
+        if (typeof _ret === "object") return _ret.v;
+      }
+
+      if (promises.length === 0) {
+        return resolved;
+      }
+
+      if (promises.length === 1) {
+        return promises[0].then(() => resolved);
+      }
+
+      return Promise.all(promises).then(() => resolved);
+    },
+
+    /**
+     * Decorates the handler to provide one or more values.
+     * @method $with
+     * @param   {Array}  ...values  -  values to provide
+     * @returns {Handler}  decorated callback handler.
+     * @for Handler
+     */
+    $with(...values) {
+      values = $flatten(values, true);
+
+      if (values.length > 0) {
+        var provider = this.$decorate();
+        values.forEach(value => provides.addHandler(provider, value));
+        return provider;
+      }
+
+      return this;
+    },
+
+    $withKeyValues(keyValues) {
+      if ($isPlainObject(keyValues)) {
+        var provider = this.$decorate();
+
+        for (var key in keyValues) {
+          provides.addHandler(provider, key, keyValues[key]);
+        }
+
+        return provider;
+      }
+
+      if (keyValues instanceof Map) {
+        var _provider = this.$decorate();
+
+        for (var [_key, value] of keyValues) {
+          provides.addHandler(_provider, _key, value);
+        }
+
+        return _provider;
+      }
+
+      throw new TypeError("The keyValues must be an object literal or Map.");
+    },
+
+    $withBindings(target, keyValues) {
+      if ($isNothing(target)) {
+        throw new Error("The scope argument is required.");
+      }
+
+      if ($isPlainObject(keyValues)) {
+        function getValue(inquiry, context) {
+          var _inquiry$parent, _inquiry$parent$bindi;
+
+          if (((_inquiry$parent = inquiry.parent) == null ? void 0 : (_inquiry$parent$bindi = _inquiry$parent.binding) == null ? void 0 : _inquiry$parent$bindi.constraint) === target) {
+            var value = keyValues[inquiry.key];
+            return $isFunction(value) ? value(inquiry, context) : value;
+          }
+        }
+
+        var provider = this.$decorate();
+
+        for (var key in keyValues) {
+          provides.addHandler(provider, key, getValue);
+        }
+
+        return provider;
+      }
+
+      if (keyValues instanceof Map) {
+        function getValue(inquiry) {
+          var _inquiry$parent2, _inquiry$parent2$bind;
+
+          if (((_inquiry$parent2 = inquiry.parent) == null ? void 0 : (_inquiry$parent2$bind = _inquiry$parent2.binding) == null ? void 0 : _inquiry$parent2$bind.constraint) === target) {
+            var value = keyValues.get(inquiry.key);
+            return $isFunction(value) ? value(inquiry, context) : value;
+          }
+        }
+
+        var _provider2 = this.$decorate();
+
+        for (var [_key2, value] of keyValues.keys) {
+          provides.addHandler(_provider2, _key2, getValue);
+        }
+
+        return _provider2;
+      }
+
+      throw new TypeError("The keyValues must be an object literal or Map.");
+    },
+
+    /**
+     * Builds a handler chain.
+     * @method next
+     * @param   {Any}  [...handlers]  -  handler chain members
+     * @returns {Handler}  chaining callback handler.
+     * @for Handler
+     */
+    $chain(...handlers) {
+      switch (handlers.length) {
+        case 0:
+          return this;
+
+        case 1:
+          return new CascadeHandler(this, handlers[0]);
+
+        default:
+          return new CompositeHandler(this, ...handlers);
+      }
+    },
+
+    /**
+     * Prevents continuous or concurrent handling on a target.
+     * @method $guard
+     * @param   {Object}  target              -  target to guard
+     * @param   {string}  [property='guard']  -  property for guard state
+     * @returns {Handler}  guarding callback handler.
+     * @for Handler
+     */
+    $guard(target, property) {
+      if (target) {
+        var guarded = false;
+        property = property || "guarded";
+        var propExists = (property in target);
+        return this.$aspect(() => {
+          if (guarded = target[property]) {
+            return false;
+          }
+
+          target[property] = true;
+          return true;
+        }, () => {
+          if (!guarded) {
+            target[property] = undefined;
+
+            if (!propExists) {
+              delete target[property];
+            }
+          }
+        });
+      }
+
+      return this;
+    },
+
+    /**
+     * Tracks the activity counts associated with a target. 
+     * @method $activity
+     * @param   {Object}  target                 -  target to track
+     * @param   {Object}  [ms=50]                -  delay to wait before tracking
+     * @param   {string}  [property='activity']  -  property for activity state
+     * @returns {Handler}  activity callback handler.
+     * @for Handler
+     */
+    $activity(target, ms, property) {
+      property = property || "$$activity";
+      var propExists = (property in target);
+      return this.$aspect(() => {
+        var state = {
+          enabled: false
+        };
+        setTimeout(() => {
+          if ("enabled" in state) {
+            state.enabled = true;
+            var activity = target[property] || 0;
+            target[property] = ++activity;
+          }
+        }, !$isNothing(ms) ? ms : 50);
+        return state;
+      }, (_, composer, state) => {
+        if (state.enabled) {
+          var activity = target[property];
+
+          if (!activity || activity === 1) {
+            target[property] = undefined;
+
+            if (!propExists) {
+              delete target[property];
+            }
+          } else {
+            target[property] = --activity;
+          }
+        }
+
+        delete state.enabled;
+      });
+    },
+
+    /**
+     * Ensures all return values are promises..
+     * @method $promises
+     * @returns {Handler}  promising callback handler.
+     * @for Handler
+     */
+    $promise() {
+      return this.$filter((callback, composer, proceed) => {
+        if (!("callbackResult" in callback)) {
+          return proceed();
+        }
+
+        try {
+          var handled = proceed();
+
+          if (handled) {
+            var result = callback.callbackResult;
+            callback.callbackResult = $isPromise(result) ? result : Promise.resolve(result);
+          }
+
+          return handled;
+        } catch (ex) {
+          callback.callbackResult = Promise.reject(ex);
+          return true;
+        }
+      });
+    },
+
+    /**
+     * Configures the receiver to set timeouts on all promises.
+     * @method $timeout
+     * @param   {number}            ms       -  duration before promise times out
+     * @param   {Function | Error}  [error]  -  error instance or custom error class
+     * @returns {Handler}  timeout callback handler.
+     * @for Handler
+     */
+    $timeout(ms, error) {
+      return this.$filter((callback, composer, proceed) => {
+        var handled = proceed();
+
+        if (!("callbackResult" in callback)) {
+          return handled;
+        }
+
+        if (handled) {
+          var result = callback.callbackResult;
+
+          if ($isPromise(result)) {
+            callback.callbackResult = new Promise(function (resolve, reject) {
+              var timeout;
+              result.then(res => {
+                if (timeout) {
+                  clearTimeout(timeout);
+                }
+
+                resolve(res);
+              }, err => {
+                if (timeout) {
+                  clearTimeout(timeout);
+                }
+
+                reject(err);
+              });
+              timeout = setTimeout(function () {
+                if (!error) {
+                  error = new TimeoutError(callback);
+                } else if ($isFunction(error)) {
+                  error = Reflect.construct(error, [callback]);
+                }
+
+                if ($isFunction(result.reject)) {
+                  result.reject(error); // TODO: cancel
+                }
+
+                reject(error);
+              }, ms);
+            });
+          }
+        }
+
+        return handled;
+      });
+    }
+
+  });
+  /**
+   * Shortcut for handling a callback.
+   * @method
+   * @static
+   * @param   {Any}       constraint  -  callback constraint
+   * @param   {Function}  handler     -  callback handler
+   * @returns {Handler} callback handler.
+   * @for Handler
+   */
+
+  Handler.$accepting = function (constraint, handler) {
+    var accepting = new Handler();
+    handles.addHandler(accepting, constraint, handler);
+    return accepting;
+  };
+  /**
+   * Shortcut for providing a callback.
+   * @method
+   * @static
+   * @param  {Any}       constraint  -  callback constraint
+   * @param  {Function}  provider    -  callback provider
+   * @returns {Handler} callback provider.
+   * @for Handler
+   */
+
+
+  Handler.$providing = function (constraint, provider) {
+    var providing = new Handler();
+    provides.addHandler(providing, constraint, provider);
+    return providing;
+  };
+
+  function aspectProceed(callback, composer, proceed, after, state) {
+    var promise;
+
+    try {
+      var handled = proceed();
+
+      if (handled) {
+        var result = callback.callbackResult;
+
+        if ($isPromise(result)) {
+          promise = result; // Use 'fulfilled' or 'rejected' handlers instead of 'finally' to ensure
+          // aspect boundary is consistent with synchronous invocations and avoid
+          // reentrancy issues.
+
+          if ($isFunction(after)) {
+            promise.then(result => after(callback, composer, state)).catch(error => after(callback, composer, state));
+          }
+        }
+      }
+
+      return handled;
+    } finally {
+      if (!promise && $isFunction(after)) {
+        after(callback, composer, state);
+      }
+    }
+  }
+
+  var _$z = createKeyChain();
+  /**
+   * Delegates properties and methods to a callback handler using 
+   * {{#crossLink "HandleMethod"}}{{/crossLink}}.
+   * @class HandleMethodDelegate
+   * @constructor
+   * @param   {Handler}  handler  -  forwarding handler 
+   * @extends Delegate
+   */
+
+
+  class HandleMethodDelegate extends Delegate {
+    constructor(handler) {
+      super();
+      _$z(this).handler = handler;
+    }
+
+    get handler() {
+      return _$z(this).handler;
+    }
+
+    get(protocol, propertyName) {
+      return delegate$1(this, MethodType.Get, protocol, propertyName, null);
+    }
+
+    set(protocol, propertyName, propertyValue) {
+      return delegate$1(this, MethodType.Set, protocol, propertyName, propertyValue);
+    }
+
+    invoke(protocol, methodName, args) {
+      return delegate$1(this, MethodType.Invoke, protocol, methodName, args);
+    }
+
+  }
+
+  function delegate$1(delegate, methodType, protocol, methodName, args) {
+    var handler = delegate.handler,
+        options = CallbackOptions.None,
+        semantics = new CallbackSemantics();
+    handler.handle(semantics, true);
+    if (!semantics.isSpecified(CallbackOptions.Duck) && DuckTyping.isAdoptedBy(protocol)) options |= CallbackOptions.Duck;
+    if (!semantics.isSpecified(CallbackOptions.Strict) && StrictProtocol.isAdoptedBy(protocol)) options |= CallbackOptions.Strict;
+
+    if (options != CallbackOptions.None) {
+      semantics.setOption(options, true);
+      handler = handler.$callOptions(options);
+    }
+
+    var handleMethod = new HandleMethod(methodType, protocol, methodName, args, semantics),
+        inference = handleMethod.inferCallback();
+
+    if (!handler.handle(inference)) {
+      throw handleMethod.notHandledError();
+    }
+
+    var result = inference.callbackResult;
+
+    if ($isPromise(result)) {
+      return result.catch(error => {
+        if (error instanceof NotHandledError) {
+          if (!(semantics.isSpecified(CallbackOptions.BestEffort) && semantics.hasOption(CallbackOptions.BestEffort))) {
+            throw handleMethod.notHandledError();
+          }
+        } else {
+          throw error;
+        }
+      });
+    }
+
+    return result;
+  }
+
+  Handler.implement({
+    /**
+     * Converts the callback handler to a {{#crossLink "Delegate"}}{{/crossLink}}.
+     * @method toDelegate
+     * @returns {HandleMethodDelegate}  delegate for this callback handler.
+     */
+    toDelegate() {
+      return new HandleMethodDelegate(this);
+    },
+
+    /**
+     * Creates a proxy for this Handler over the `protocol`.
+     * @method proxy
+     * @param   {Protocol}  protocol  -  the protocol to proxy.
+     * @returns {Protocol}  an instance of the protocol bound to this handler.
+     */
+    proxy(protocol) {
+      if (!Protocol.isProtocol(protocol)) {
+        throw new TypeError("The protocol is not valid.");
+      }
+
+      return new protocol(new HandleMethodDelegate(this));
+    }
+
+  });
+
+  var _dec$m, _class$q, _dec2$7, _class2$6;
+
+  var _$A = createKey();
+
+  var Initializer = (_dec$m = conformsTo(Filtering), _dec$m(_class$q = class Initializer {
+    constructor(initializer) {
+      if (!$isFunction(initializer)) {
+        throw new Error("The initializer must be a function.");
+      }
+
+      _$A(this).initializer = initializer;
+    }
+
+    get order() {
+      return Number.MAX_SAFE_INTEGER - 100;
+    }
+
+    next(callback, {
+      next
+    }) {
+      var instance = next();
+      return $isPromise(instance) ? instance.then(result => _initialize.call(this, result)) : _initialize.call(this, instance);
+    }
+
+  }) || _class$q);
+
+  function _initialize(instance) {
+    var initializer = _$A(this).initializer,
+        promise = initializer.call(instance);
+
+    return $isPromise(promise) ? promise.then(() => instance) : instance;
+  }
+
+  var InitializerProvider = (_dec2$7 = conformsTo(FilteringProvider), _dec2$7(_class2$6 = class InitializerProvider {
+    constructor(initializer) {
+      _$A(this).initializer = [new Initializer(initializer)];
+    }
+
+    get required() {
+      return true;
+    }
+
+    appliesTo(callback) {
+      return callback instanceof Inquiry || callback instanceof Creation;
+    }
+
+    getFilters(binding, callback, composer) {
+      return _$A(this).initializer;
+    }
+
+  }) || _class2$6);
+  function initialize(target, key, descriptor) {
+    if (!isDescriptor(descriptor)) {
+      throw new SyntaxError("@initialize cannot be applied to classes.");
+    }
+
+    var {
+      value
+    } = descriptor;
+
+    if (!$isFunction(value)) {
+      throw new SyntaxError("@initialize can only be applied to methods.");
+    }
+
+    descriptor.value = cannotCallInitializer;
+    var constructor = target.constructor,
+        filters = filter.getOrCreateOwn(target, "constructor", () => new FilteredScope());
+
+    if ((constructor == null ? void 0 : constructor.prototype) === target) {
+      filter.getOrCreateOwn(constructor, "constructor", () => filters);
+    }
+
+    filters.addFilters(new InitializerProvider(value));
+    return descriptor;
+  }
+
+  function cannotCallInitializer() {
+    throw new Error("An @initialize method cannot be called directly.");
+  }
+
+  var _$B = createKey();
+
+  class InjectResolver extends KeyResolver {
+    constructor(key) {
+      if ($isNothing(key)) {
+        throw new Error("The key argument is required.");
+      }
+
+      super();
+      _$B(this).key = key;
+    }
+
+    get key() {
+      return _$B(this).key;
+    }
+
+    createInquiry(typeInfo, parent) {
+      var many = typeInfo.flags.hasFlag(TypeFlags.Array);
+      return new Inquiry(this.key, many, parent);
+    }
+
+  }
+  var inject = createTypeInfoDecorator((key, typeInfo, [actualKey]) => {
+    typeInfo.keyResolver = new InjectResolver(actualKey || key);
+  });
+
+  var _dec$n, _class$r;
+  var $proxy = $createQualifier();
+  var ProxyResolver = (_dec$n = conformsTo(KeyResolving), _dec$n(_class$r = class ProxyResolver {
+    validate(typeInfo) {
+      if ($isNothing(typeInfo.type)) {
+        throw new TypeError("Unable to determine @proxy argument type.");
+      }
+
+      if (!typeInfo.flags.hasFlag(TypeFlags.Protocol)) {
+        throw new TypeError("@proxy requires a Protocol argument.");
+      }
+
+      if (typeInfo.flags.hasFlag(TypeFlags.Array)) {
+        throw new TypeError("@proxy arguments cannot be collections.");
+      }
+    }
+
+    resolve(typeInfo, handler) {
+      return handler.proxy(typeInfo.type);
+    }
+
+  }) || _class$r);
+  var proxyResolver = new ProxyResolver();
+  TypeInfo.registerQualifier($proxy, ti => ti.keyResolver = proxyResolver);
+  var proxy = createTypeInfoDecorator((key, typeInfo, [type]) => {
+    var protocol = TypeInfo.parse(type);
+    protocol.keyResolver = proxyResolver;
+    typeInfo.merge(protocol);
   });
 
   /**
@@ -11252,253 +11266,7 @@
 
   }
 
-  var _dec$p, _class$u;
-
-  var _$C = createKeyChain();
-  /**
-   * Base callback for mapping.
-   * @class MapCallback
-   * @constructor
-   * @param   {Any}   format  -  format specifier
-   * @param   {Array} seen    -  array of seen objects
-   * @extends Base
-   */
-
-
-  var MapCallback = (_dec$p = conformsTo(CallbackControl), _dec$p(_class$u = class MapCallback extends exports.Base {
-    constructor(format, seen) {
-      if (new.target === MapCallback) {
-        throw new Error("MapCallback is abstract and cannot be instantiated.");
-      }
-
-      super();
-
-      var _this = _$C(this);
-
-      _this.format = format;
-      _this.results = [];
-      _this.promises = [];
-      _this.seen = seen || [];
-    }
-
-    get format() {
-      return _$C(this).format;
-    }
-
-    get seen() {
-      return _$C(this).seen;
-    }
-
-    get callbackResult() {
-      if (_$C(this).result === undefined) {
-        var {
-          results,
-          promises
-        } = _$C(this);
-
-        _$C(this).result = promises.length == 0 ? results[0] : Promise.all(promises).then(() => results[0]);
-      }
-
-      return _$C(this).result;
-    }
-
-    set callbackResult(value) {
-      _$C(this).result = value;
-    }
-
-    addResult(result) {
-      if ($isNothing(result)) return;
-
-      if ($isPromise(result)) {
-        _$C(this).promises.push(result.then(res => {
-          if (res != null) {
-            _$C(this).results.push(res);
-          }
-        }));
-      } else {
-        _$C(this).results.push(result);
-      }
-
-      _$C(this).result = undefined;
-    }
-
-  }) || _class$u);
-  /**
-   * Callback to map an `object` to `format`.
-   * @class MapFrom
-   * @constructor
-   * @param   {Object}  object  -  object to map
-   * @param   {Any}     format  -  format specifier
-   * @param   {Array}   seen    -  array of seen objects
-   * @extends MapCallback
-   */
-
-  class MapFrom extends MapCallback {
-    constructor(object, format, seen) {
-      if ($isNothing(object)) {
-        throw new TypeError("Missing object to map.");
-      }
-
-      if (checkCircularity$1(object, seen)) {
-        throw new Error(`Circularity detected: MapFrom ${object} in progress.`);
-      }
-
-      super(format, seen);
-      _$C(this).object = object;
-    }
-
-    get object() {
-      return _$C(this).object;
-    }
-
-    get callbackPolicy() {
-      return mapsFrom.policy;
-    }
-
-    dispatch(handler, greedy, composer) {
-      var object = this.object,
-          source = $classOf(object);
-      if ($isNothing(source)) return false;
-
-      var results = _$C(this).results,
-          count = results.length;
-
-      return mapsFrom.dispatch(handler, this, this, source, composer, false, this.addResult.bind(this)) || results.length > count;
-    }
-
-    toString() {
-      return `MapFrom | ${this.object} to ${String(this.format)}`;
-    }
-
-  }
-  /**
-   * Callback to map a formatted `value` into an object.
-   * @class MapTo
-   * @constructor
-   * @param   {Any}              value            -  formatted value
-   * @param   {Any}              format           -  format specifier
-   * @param   {Function|Object}  classOrInstance  -  instance or class to unmap
-   * @param   {Array}            seen             -  array of seen objects
-   * @extends MapCallback
-   */
-
-  class MapTo extends MapCallback {
-    constructor(value, format, classOrInstance, seen) {
-      if ($isNothing(value)) {
-        throw new TypeError("Missing value to map.");
-      }
-
-      if (checkCircularity$1(value, seen)) {
-        throw new Error(`Circularity detected: MapTo ${value} in progress.`);
-      }
-
-      super(format, seen);
-
-      if ($isNothing(classOrInstance) && !$isString$1(value)) {
-        classOrInstance = $classOf(value);
-
-        if (classOrInstance === Object) {
-          classOrInstance = AnyObject;
-        }
-      }
-
-      var _this = _$C(this);
-
-      _this.value = value;
-      _this.classOrInstance = classOrInstance;
-    }
-
-    get value() {
-      return _$C(this).value;
-    }
-
-    get classOrInstance() {
-      return _$C(this).classOrInstance;
-    }
-
-    get callbackPolicy() {
-      return mapsTo.policy;
-    }
-
-    dispatch(handler, greedy, composer) {
-      var results = _$C(this).results,
-          count = results.length,
-          source = this.classOrInstance || this.value;
-
-      return mapsTo.dispatch(handler, this, this, source, composer, false, this.addResult.bind(this)) || results.length > count;
-    }
-
-    toString() {
-      return `MapTo | ${String(this.format)} ${this.value}`;
-    }
-
-  }
-
-  function checkCircularity$1(object, seen) {
-    return $isObject(object) && (seen == null ? void 0 : seen.includes(object));
-  }
-
-  Handler.implement({
-    /**
-     * Maps the `object` to a value in `format`.
-     * @method $mapFrom
-     * @param   {Object}  object  -  object to map
-     * @param   {Any}     format  -  format specifier
-     * @param   {Array}   seen    -  array of seen objects
-     * @returns {Any}  mapped value.
-     * @for Handler
-     */
-    $mapFrom(object, format, seen) {
-      if ($isNothing(object)) {
-        throw new TypeError("The object argument is required.");
-      }
-
-      var mapFrom = new MapFrom(object, format, seen);
-
-      if (!this.handle(mapFrom)) {
-        throw new NotHandledError(mapFrom);
-      }
-
-      return mapFrom.callbackResult;
-    },
-
-    /**
-     * Maps the formatted `value` in `format` to `classOrInstance`.
-     * @method $mapTo 
-     * @param   {Any}              value            -  formatted value
-     * @param   {Any}              format           -  format specifier
-     * @param   {Function|Object}  classOrInstance  -  instance or class to unmap
-     * @param   {Array}            seen             -  array of seen objects
-     * @return  {Object}  unmapped instance.
-     * @for Handler
-     */
-    $mapTo(value, format, classOrInstance, seen) {
-      if ($isNothing(value)) {
-        throw new TypeError("The object argument is required.");
-      }
-
-      if (Array.isArray(classOrInstance)) {
-        var type = classOrInstance[0];
-
-        if (type && !$isFunction(type) && !Array.isArray(type)) {
-          throw new TypeError("Cannot infer array type.");
-        }
-      } else if (Array.isArray(value) && $isFunction(classOrInstance)) {
-        classOrInstance = [classOrInstance];
-      }
-
-      var mapTo = new MapTo(value, format, classOrInstance, seen);
-
-      if (!this.handle(mapTo)) {
-        throw new NotHandledError(mapTo);
-      }
-
-      return mapTo.callbackResult;
-    }
-
-  });
-
-  var _dec$q, _dec2$8, _dec3$5, _dec4$2, _dec5$2, _dec6$1, _dec7, _dec8, _dec9, _dec10, _dec11, _class$v, _class2$8, _temp$4, _temp2$2, _temp3$1, _temp4$1;
+  var _dec$p, _dec2$8, _dec3$5, _dec4$2, _dec5$2, _dec6$1, _dec7, _dec8, _dec9, _dec10, _dec11, _class$u, _class2$8, _temp$4, _temp2$2, _temp3$1, _temp4$1;
   var JsonFormat = Symbol("json"),
       DefaultTypeIdProperty = "$type";
   /**
@@ -11507,7 +11275,7 @@
    * @extends AbstractMapping
    */
 
-  var JsonMapping = (_dec$q = provides(), _dec2$8 = singleton(), _dec3$5 = formats(JsonFormat, /application[/]json/), _dec4$2 = mapsFrom(Date), _dec5$2 = mapsFrom(RegExp), _dec6$1 = mapsFrom(Either), _dec7 = mapsFrom(Array), _dec8 = mapsTo(Date), _dec9 = mapsTo(RegExp), _dec10 = mapsTo(Either), _dec11 = mapsTo(Array), _dec$q(_class$v = _dec2$8(_class$v = _dec3$5(_class$v = (_class2$8 = (_temp4$1 = (_temp3$1 = (_temp2$2 = (_temp$4 = class JsonMapping extends AbstractMapping {
+  var JsonMapping = (_dec$p = provides(), _dec2$8 = singleton(), _dec3$5 = formats(JsonFormat, /application[/]json/), _dec4$2 = mapsFrom(Date), _dec5$2 = mapsFrom(RegExp), _dec6$1 = mapsFrom(Either), _dec7 = mapsFrom(Array), _dec8 = mapsTo(Date), _dec9 = mapsTo(RegExp), _dec10 = mapsTo(Either), _dec11 = mapsTo(Array), _dec$p(_class$u = _dec2$8(_class$u = _dec3$5(_class$u = (_class2$8 = (_temp4$1 = (_temp3$1 = (_temp2$2 = (_temp$4 = class JsonMapping extends AbstractMapping {
     mapFromDate({
       object
     }) {
@@ -11757,7 +11525,7 @@
       return this.mapSurrogate(object, composer) || object;
     }
 
-  }, _temp$4), options(MapOptions)(_temp$4.prototype, "mapFromEither", 1), _temp2$2), _temp3$1), options(MapOptions)(_temp3$1.prototype, "mapToEither", 1), _temp4$1), (_applyDecoratedDescriptor(_class2$8.prototype, "mapFromDate", [_dec4$2], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromDate"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapFromRegExp", [_dec5$2], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromRegExp"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapFromEither", [_dec6$1], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromEither"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapFromArray", [_dec7], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromArray"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToDate", [_dec8], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToDate"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToRegExp", [_dec9], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToRegExp"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToEither", [_dec10], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToEither"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToArray", [_dec11], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToArray"), _class2$8.prototype)), _class2$8)) || _class$v) || _class$v) || _class$v);
+  }, _temp$4), options(MapOptions)(_temp$4.prototype, "mapFromEither", 1), _temp2$2), _temp3$1), options(MapOptions)(_temp3$1.prototype, "mapToEither", 1), _temp4$1), (_applyDecoratedDescriptor(_class2$8.prototype, "mapFromDate", [_dec4$2], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromDate"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapFromRegExp", [_dec5$2], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromRegExp"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapFromEither", [_dec6$1], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromEither"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapFromArray", [_dec7], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapFromArray"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToDate", [_dec8], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToDate"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToRegExp", [_dec9], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToRegExp"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToEither", [_dec10], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToEither"), _class2$8.prototype), _applyDecoratedDescriptor(_class2$8.prototype, "mapToArray", [_dec11], Object.getOwnPropertyDescriptor(_class2$8.prototype, "mapToArray"), _class2$8.prototype)), _class2$8)) || _class$u) || _class$u) || _class$u);
 
   function canMapJson(value) {
     return value !== undefined && !$isFunction(value) && !$isSymbol(value);
@@ -11821,6 +11589,252 @@
 
     target[key] = composer.$mapTo(value, format, type, seen);
   }
+
+  var _dec$q, _class$v;
+
+  var _$C = createKeyChain();
+  /**
+   * Base callback for mapping.
+   * @class MapCallback
+   * @constructor
+   * @param   {Any}   format  -  format specifier
+   * @param   {Array} seen    -  array of seen objects
+   * @extends Base
+   */
+
+
+  var MapCallback = (_dec$q = conformsTo(CallbackControl), _dec$q(_class$v = class MapCallback extends exports.Base {
+    constructor(format, seen) {
+      if (new.target === MapCallback) {
+        throw new Error("MapCallback is abstract and cannot be instantiated.");
+      }
+
+      super();
+
+      var _this = _$C(this);
+
+      _this.format = format;
+      _this.results = [];
+      _this.promises = [];
+      _this.seen = seen || [];
+    }
+
+    get format() {
+      return _$C(this).format;
+    }
+
+    get seen() {
+      return _$C(this).seen;
+    }
+
+    get callbackResult() {
+      if (_$C(this).result === undefined) {
+        var {
+          results,
+          promises
+        } = _$C(this);
+
+        _$C(this).result = promises.length == 0 ? results[0] : Promise.all(promises).then(() => results[0]);
+      }
+
+      return _$C(this).result;
+    }
+
+    set callbackResult(value) {
+      _$C(this).result = value;
+    }
+
+    addResult(result) {
+      if ($isNothing(result)) return;
+
+      if ($isPromise(result)) {
+        _$C(this).promises.push(result.then(res => {
+          if (res != null) {
+            _$C(this).results.push(res);
+          }
+        }));
+      } else {
+        _$C(this).results.push(result);
+      }
+
+      _$C(this).result = undefined;
+    }
+
+  }) || _class$v);
+  /**
+   * Callback to map an `object` to `format`.
+   * @class MapFrom
+   * @constructor
+   * @param   {Object}  object  -  object to map
+   * @param   {Any}     format  -  format specifier
+   * @param   {Array}   seen    -  array of seen objects
+   * @extends MapCallback
+   */
+
+  class MapFrom extends MapCallback {
+    constructor(object, format, seen) {
+      if ($isNothing(object)) {
+        throw new TypeError("Missing object to map.");
+      }
+
+      if (checkCircularity$1(object, seen)) {
+        throw new Error(`Circularity detected: MapFrom ${object} in progress.`);
+      }
+
+      super(format, seen);
+      _$C(this).object = object;
+    }
+
+    get object() {
+      return _$C(this).object;
+    }
+
+    get callbackPolicy() {
+      return mapsFrom.policy;
+    }
+
+    dispatch(handler, greedy, composer) {
+      var object = this.object,
+          source = $classOf(object);
+      if ($isNothing(source)) return false;
+
+      var results = _$C(this).results,
+          count = results.length;
+
+      return mapsFrom.dispatch(handler, this, this, source, composer, false, this.addResult.bind(this)) || results.length > count;
+    }
+
+    toString() {
+      return `MapFrom | ${this.object} to ${String(this.format)}`;
+    }
+
+  }
+  /**
+   * Callback to map a formatted `value` into an object.
+   * @class MapTo
+   * @constructor
+   * @param   {Any}              value            -  formatted value
+   * @param   {Any}              format           -  format specifier
+   * @param   {Function|Object}  classOrInstance  -  instance or class to unmap
+   * @param   {Array}            seen             -  array of seen objects
+   * @extends MapCallback
+   */
+
+  class MapTo extends MapCallback {
+    constructor(value, format, classOrInstance, seen) {
+      if ($isNothing(value)) {
+        throw new TypeError("Missing value to map.");
+      }
+
+      if (checkCircularity$1(value, seen)) {
+        throw new Error(`Circularity detected: MapTo ${value} in progress.`);
+      }
+
+      super(format, seen);
+
+      if ($isNothing(classOrInstance) && !$isString$1(value)) {
+        classOrInstance = $classOf(value);
+
+        if (classOrInstance === Object) {
+          classOrInstance = AnyObject;
+        }
+      }
+
+      var _this = _$C(this);
+
+      _this.value = value;
+      _this.classOrInstance = classOrInstance;
+    }
+
+    get value() {
+      return _$C(this).value;
+    }
+
+    get classOrInstance() {
+      return _$C(this).classOrInstance;
+    }
+
+    get callbackPolicy() {
+      return mapsTo.policy;
+    }
+
+    dispatch(handler, greedy, composer) {
+      var results = _$C(this).results,
+          count = results.length,
+          source = this.classOrInstance || this.value;
+
+      return mapsTo.dispatch(handler, this, this, source, composer, false, this.addResult.bind(this)) || results.length > count;
+    }
+
+    toString() {
+      return `MapTo | ${String(this.format)} ${this.value}`;
+    }
+
+  }
+
+  function checkCircularity$1(object, seen) {
+    return $isObject(object) && (seen == null ? void 0 : seen.includes(object));
+  }
+
+  Handler.implement({
+    /**
+     * Maps the `object` to a value in `format`.
+     * @method $mapFrom
+     * @param   {Object}  object  -  object to map
+     * @param   {Any}     format  -  format specifier
+     * @param   {Array}   seen    -  array of seen objects
+     * @returns {Any}  mapped value.
+     * @for Handler
+     */
+    $mapFrom(object, format, seen) {
+      if ($isNothing(object)) {
+        throw new TypeError("The object argument is required.");
+      }
+
+      var mapFrom = new MapFrom(object, format, seen);
+
+      if (!this.handle(mapFrom)) {
+        throw new NotHandledError(mapFrom);
+      }
+
+      return mapFrom.callbackResult;
+    },
+
+    /**
+     * Maps the formatted `value` in `format` to `classOrInstance`.
+     * @method $mapTo 
+     * @param   {Any}              value            -  formatted value
+     * @param   {Any}              format           -  format specifier
+     * @param   {Function|Object}  classOrInstance  -  instance or class to unmap
+     * @param   {Array}            seen             -  array of seen objects
+     * @return  {Object}  unmapped instance.
+     * @for Handler
+     */
+    $mapTo(value, format, classOrInstance, seen) {
+      if ($isNothing(value)) {
+        throw new TypeError("The object argument is required.");
+      }
+
+      if (Array.isArray(classOrInstance)) {
+        var type = classOrInstance[0];
+
+        if (type && !$isFunction(type) && !Array.isArray(type)) {
+          throw new TypeError("Cannot infer array type.");
+        }
+      } else if (Array.isArray(value) && $isFunction(classOrInstance)) {
+        classOrInstance = [classOrInstance];
+      }
+
+      var mapTo = new MapTo(value, format, classOrInstance, seen);
+
+      if (!this.handle(mapTo)) {
+        throw new NotHandledError(mapTo);
+      }
+
+      return mapTo.callbackResult;
+    }
+
+  });
 
   var _class$w, _temp$5;
   var Routed = (_class$w = (_temp$5 = class Routed extends MessageWrapper {
@@ -11925,7 +11939,7 @@
       var groups = [..._$D(this).groups.entries()],
           complete = Promise.all(groups.map(([uri, requests]) => {
         var messages = requests.map(r => r.message);
-        return Promise.resolve(composer.send(new Concurrent(messages).routeTo(uri))).then(result => {
+        return Promise.resolve(composer.$send(new Concurrent(messages).routeTo(uri))).then(result => {
           var responses = result.responses; // Cancel when available on Promise
           // for (let i = responses.length; i < requests.length; ++i) {
           //    requests[i].promise.cancel();
@@ -11974,11 +11988,25 @@
 
   }
 
-  var _dec$s, _class$y, _dec2$a, _class2$a;
+  var _dec$s, _class$y, _class2$a;
+  var PassThroughRouter = (_dec$s = handles(Routed), unmanaged(_class$y = (_class2$a = class PassThroughRouter extends Handler {
+    route(routed, {
+      composer
+    }) {
+      return routed.route === PassThroughRouter.scheme ? composer.$send(routed.message) : $unhandled;
+    }
+
+    static get scheme() {
+      return "pass-through";
+    }
+
+  }, (_applyDecoratedDescriptor(_class2$a.prototype, "route", [skipFilters, _dec$s], Object.getOwnPropertyDescriptor(_class2$a.prototype, "route"), _class2$a.prototype)), _class2$a)) || _class$y);
+
+  var _dec$t, _class$z, _dec2$a, _class2$b;
 
   var _$E = createKey();
 
-  var RoutesFilter = (_dec$s = conformsTo(Filtering), _dec$s(_class$y = class RoutesFilter {
+  var RoutesFilter = (_dec$t = conformsTo(Filtering), _dec$t(_class$z = class RoutesFilter {
     constructor(schemes) {
       _$E(this).schemes = schemes;
     }
@@ -11998,15 +12026,15 @@
         var batcher = composer.$getBatcher(BatchRouter);
 
         if (!$isNothing(batcher)) {
-          return composer.$enableFilters().command(new BatchRouted(routed, rawCallback));
+          return composer.$enableFilters().$command(new BatchRouted(routed, rawCallback));
         }
       }
 
       return next(composer.$enableFilters(), matches);
     }
 
-  }) || _class$y);
-  var RoutesProvider = (_dec2$a = conformsTo(FilteringProvider), _dec2$a(_class2$a = class RoutesProvider {
+  }) || _class$z);
+  var RoutesProvider = (_dec2$a = conformsTo(FilteringProvider), _dec2$a(_class2$b = class RoutesProvider {
     constructor(schemes) {
       if ($isNothing(schemes) || schemes.length === 0) {
         throw new Error("The schemes argument cannot be empty.");
@@ -12023,7 +12051,7 @@
       return _$E(this).filters;
     }
 
-  }) || _class2$a);
+  }) || _class2$b);
   var routes = createFilterDecorator((target, key, descriptor, schemes) => new RoutesProvider($flatten(schemes, true)), true);
 
   function getScheme(routed) {
@@ -12042,12 +12070,12 @@
   Handler.implement({
     concurrent(...requests) {
       var reqs = $flatten(requests, true);
-      return $isNothing(reqs) || reqs.length === 0 ? new ScheduledResult() : this.send(new Concurrent(reqs));
+      return $isNothing(reqs) || reqs.length === 0 ? new ScheduledResult() : this.$send(new Concurrent(reqs));
     },
 
     sequential(...requests) {
       var reqs = $flatten(requests, true);
-      return $isNothing(reqs) || reqs.length === 0 ? new ScheduledResult() : this.send(new Sequential(reqs));
+      return $isNothing(reqs) || reqs.length === 0 ? new ScheduledResult() : this.$send(new Sequential(reqs));
     }
 
   });
@@ -12137,14 +12165,14 @@
     return new MetadataConstraint(...args);
   });
 
-  var _dec$t, _class$z, _temp$6;
+  var _dec$u, _class$A, _temp$6;
   /**
    * Options for controlling filters.
    * @class FilterOptions
    * @extends Options
    */
 
-  var FilterOptions = (_dec$t = handlesOptions("filterOptions"), _dec$t(_class$z = (_temp$6 = class FilterOptions extends Options {
+  var FilterOptions = (_dec$u = handlesOptions("filterOptions"), _dec$u(_class$A = (_temp$6 = class FilterOptions extends Options {
     constructor(...args) {
       super(...args);
 
@@ -12153,7 +12181,7 @@
       _defineProperty(this, "skipFilters", void 0);
     }
 
-  }, _temp$6)) || _class$z);
+  }, _temp$6)) || _class$A);
 
   Handler.implement({
     $skipFilters(skip = true) {
@@ -12264,6 +12292,19 @@
     }) || _class;
   };
 
+  var underscoreNaming = Base => {
+    var _dec, _class;
+
+    return _dec = conformsTo(Mapping), _dec(_class = class extends Base {
+      getPropertyName(target, key) {
+        if (!$isNothing(key)) {
+          return key.split(/(?=[A-Z])/).join('_').toLowerCase();
+        }
+      }
+
+    }) || _class;
+  };
+
   function useEnumNames(...enumTypes) {
     enumTypes = validateEnumTypes(enumTypes);
     return Base => {
@@ -12297,33 +12338,6 @@
       return true;
     });
   }
-
-  var underscoreNaming = Base => {
-    var _dec, _class;
-
-    return _dec = conformsTo(Mapping), _dec(_class = class extends Base {
-      getPropertyName(target, key) {
-        if (!$isNothing(key)) {
-          return key.split(/(?=[A-Z])/).join('_').toLowerCase();
-        }
-      }
-
-    }) || _class;
-  };
-
-  var _dec$u, _class$A, _class2$b;
-  var PassThroughRouter = (_dec$u = handles(Routed), unmanaged(_class$A = (_class2$b = class PassThroughRouter extends Handler {
-    route(routed, {
-      composer
-    }) {
-      return routed.route === PassThroughRouter.scheme ? composer.send(routed.message) : $unhandled;
-    }
-
-    static get scheme() {
-      return "pass-through";
-    }
-
-  }, (_applyDecoratedDescriptor(_class2$b.prototype, "route", [skipFilters, _dec$u], Object.getOwnPropertyDescriptor(_class2$b.prototype, "route"), _class2$b.prototype)), _class2$b)) || _class$A);
 
   exports.$all = $all;
   exports.$child = $child;
@@ -12586,4 +12600,4 @@
 
   Object.defineProperty(exports, '__esModule', { value: true });
 
-})));
+});

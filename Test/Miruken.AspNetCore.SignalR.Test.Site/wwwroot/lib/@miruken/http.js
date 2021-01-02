@@ -1,8 +1,4 @@
-(function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('miruken-core'), require('@microsoft/signalr')) :
-  typeof define === 'function' && define.amd ? define(['exports', 'miruken-core', '@microsoft/signalr'], factory) :
-  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.mirukenHttp = {}, global.mirukenCore, global.signalr));
-}(this, (function (exports, mirukenCore, signalr) { 'use strict';
+define(['exports', '@miruken/core', '@microsoft/signalr', '@miruken/validate'], function (exports, core, signalR, validate) { 'use strict';
 
   function _defineProperty(obj, key, value) {
     if (key in obj) {
@@ -49,7 +45,7 @@
   }
 
   var _dec, _dec2, _class, _temp, _dec3, _dec4, _dec5, _dec6, _dec7, _dec8, _class3, _class4;
-  var ErrorData = (_dec = mirukenCore.surrogate(Error), _dec2 = mirukenCore.typeId("Miruken.Http.ExceptionData, Miruken.Http"), _dec(_class = _dec2(_class = (_temp = class ErrorData {
+  var ErrorData = (_dec = core.surrogate(Error), _dec2 = core.typeId("Miruken.Http.ExceptionData, Miruken.Http"), _dec(_class = _dec2(_class = (_temp = class ErrorData {
     constructor(message) {
       _defineProperty(this, "exceptionType", void 0);
 
@@ -61,7 +57,7 @@
     }
 
   }, _temp)) || _class) || _class);
-  var ErrorMapping = (_dec3 = mirukenCore.provides(), _dec4 = mirukenCore.singleton(), _dec5 = mirukenCore.formats(Error), _dec6 = mirukenCore.mapsFrom(ErrorData), _dec7 = mirukenCore.formats(ErrorData), _dec8 = mirukenCore.mapsFrom(Error), _dec3(_class3 = _dec4(_class3 = (_class4 = class ErrorMapping extends mirukenCore.Handler {
+  var ErrorMapping = (_dec3 = core.provides(), _dec4 = core.singleton(), _dec5 = core.formats(Error), _dec6 = core.mapsFrom(ErrorData), _dec7 = core.formats(ErrorData), _dec8 = core.mapsFrom(Error), _dec3(_class3 = _dec4(_class3 = (_class4 = class ErrorMapping extends core.Handler {
     mapToError({
       object
     }) {
@@ -82,47 +78,7 @@
 
   }, (_applyDecoratedDescriptor(_class4.prototype, "mapToError", [_dec5, _dec6], Object.getOwnPropertyDescriptor(_class4.prototype, "mapToError"), _class4.prototype), _applyDecoratedDescriptor(_class4.prototype, "mapToErrorData", [_dec7, _dec8], Object.getOwnPropertyDescriptor(_class4.prototype, "mapToErrorData"), _class4.prototype)), _class4)) || _class3) || _class3);
 
-  class HttpError extends Error {
-    constructor(statusCode, message, inner) {
-      if (!mirukenCore.$isNumber(statusCode)) {
-        throw new TypeError("The statusCode must be a number.");
-      }
-
-      super(message || (inner == null ? void 0 : inner.message));
-
-      _defineProperty(this, "statusCode", void 0);
-
-      _defineProperty(this, "content", void 0);
-
-      _defineProperty(this, "inner", void 0);
-
-      this.statusCode = statusCode;
-      this.inner = inner;
-
-      if (Error.captureStackTrace) {
-        Error.captureStackTrace(this, this.constructor);
-      }
-    }
-
-  }
-
-  var _dec$1, _class$1, _temp$1;
-  var HttpOptions = (_dec$1 = mirukenCore.handlesOptions("httpOptions"), _dec$1(_class$1 = (_temp$1 = class HttpOptions extends mirukenCore.Options {
-    constructor(...args) {
-      super(...args);
-
-      _defineProperty(this, "baseUrl", void 0);
-
-      _defineProperty(this, "timeout", void 0);
-
-      _defineProperty(this, "pipeline", void 0);
-
-      _defineProperty(this, "withCredentials", void 0);
-    }
-
-  }, _temp$1)) || _class$1);
-
-  class ResourceWrapper extends mirukenCore.Request {
+  class ResourceWrapper extends core.Request {
     constructor(resource) {
       if (new.target === ResourceWrapper) {
         throw new TypeError("ResourceWrapper cannot be instantiated.");
@@ -156,7 +112,7 @@
           resourceKey = resource == null ? void 0 : resource.getCacheKey == null ? void 0 : resource.getCacheKey();
 
       if (!$isNothing(resourceKey)) {
-        return JSON.stringify(this, (name, value) => name === "request" ? `${mirukenCore.assignID(mirukenCore.$classOf(resource))}#${resourceKey}` : value);
+        return JSON.stringify(this, (name, value) => name === "request" ? `${core.assignID(core.$classOf(resource))}#${resourceKey}` : value);
       }
     }
 
@@ -183,6 +139,24 @@
   class DeleteResponse extends ResourceResponse {}
   class HeadRequest extends ResourceRequest {}
   class HeadResponse extends ResourceResponse {}
+
+  var _dec$1, _class$1, _temp$1;
+  var HttpOptions = (_dec$1 = core.handlesOptions("httpOptions"), _dec$1(_class$1 = (_temp$1 = class HttpOptions extends core.Options {
+    constructor(...args) {
+      super(...args);
+
+      _defineProperty(this, "baseUrl", void 0);
+
+      _defineProperty(this, "timeout", void 0);
+
+      _defineProperty(this, "headers", void 0);
+
+      _defineProperty(this, "pipeline", void 0);
+
+      _defineProperty(this, "withCredentials", void 0);
+    }
+
+  }, _temp$1)) || _class$1);
 
   var {
     toString
@@ -221,17 +195,17 @@
       resource
     } = request;
 
-    if (mirukenCore.$isNothing(headers["Accept"])) {
+    if (core.$isNothing(headers["Accept"])) {
       headers["Accept"] = "application/json, text/plain, */*";
     }
 
-    if (mirukenCore.$isNothing(resource)) {
+    if (core.$isNothing(resource)) {
       delete headers["Content-Type"];
-    } else if (mirukenCore.$isNothing(resource.contentType)) {
+    } else if (core.$isNothing(resource.contentType)) {
       request.contentType = headers["Content-Type"];
     }
 
-    if (!mirukenCore.$isNothing(resource) && mirukenCore.$isNothing(resource.contentType)) {
+    if (!core.$isNothing(resource) && core.$isNothing(resource.contentType)) {
       request.contentType = inferContentType(resource);
     }
 
@@ -248,7 +222,7 @@
       return "application/x-www-form-urlencoded;charset=utf-8";
     }
 
-    if (mirukenCore.$isObject(resource)) {
+    if (core.$isObject(resource)) {
       return "application/json;charset=utf-8";
     }
 
@@ -257,7 +231,7 @@
 
   var _dec$2, _dec2$1, _dec3$1, _dec4$1, _dec5$1, _dec6$1, _class$2, _temp$2, _temp2, _temp3, _temp4, _temp5, _temp6, _temp7, _temp8, _temp9, _temp10, _temp11, _temp12;
   var DEFAULT_PIPELINE = [normalizeHttpRequest];
-  var HttpHandler = (_dec$2 = mirukenCore.handles(GetRequest), _dec2$1 = mirukenCore.handles(PutRequest), _dec3$1 = mirukenCore.handles(PostRequest), _dec4$1 = mirukenCore.handles(PatchRequest), _dec5$1 = mirukenCore.handles(DeleteRequest), _dec6$1 = mirukenCore.handles(HeadRequest), (_class$2 = (_temp12 = (_temp11 = (_temp10 = (_temp9 = (_temp8 = (_temp7 = (_temp6 = (_temp5 = (_temp4 = (_temp3 = (_temp2 = (_temp$2 = class HttpHandler extends mirukenCore.Handler {
+  var HttpHandler = (_dec$2 = core.handles(GetRequest), _dec2$1 = core.handles(PutRequest), _dec3$1 = core.handles(PostRequest), _dec4$1 = core.handles(PatchRequest), _dec5$1 = core.handles(DeleteRequest), _dec6$1 = core.handles(HeadRequest), (_class$2 = (_temp12 = (_temp11 = (_temp10 = (_temp9 = (_temp8 = (_temp7 = (_temp6 = (_temp5 = (_temp4 = (_temp3 = (_temp2 = (_temp$2 = class HttpHandler extends core.Handler {
     constructor() {
       if (new.target === HttpHandler) {
         throw new Error("HttpHandler cannot be instantiated.");
@@ -303,7 +277,7 @@
     }
 
     sendRequest(verb, url, request, payload, response, options, composer) {
-      throw new Error(`${mirukenCore.$classOf(this).name} must override sendRequest().`);
+      throw new Error(`${core.$classOf(this).name} must override sendRequest().`);
     }
 
     createUrl(request, options, composer) {
@@ -314,7 +288,7 @@
       return resourceUri instanceof URL ? resourceUri : new URL(resourceUri, baseAddress || (options == null ? void 0 : options.baseUrl));
     }
 
-  }, _temp$2), mirukenCore.options(HttpOptions)(_temp$2.prototype, "get", 1), _temp2), _temp3), mirukenCore.options(HttpOptions)(_temp3.prototype, "put", 1), _temp4), _temp5), mirukenCore.options(HttpOptions)(_temp5.prototype, "post", 1), _temp6), _temp7), mirukenCore.options(HttpOptions)(_temp7.prototype, "patch", 1), _temp8), _temp9), mirukenCore.options(HttpOptions)(_temp9.prototype, "delete", 1), _temp10), _temp11), mirukenCore.options(HttpOptions)(_temp11.prototype, "delete", 1), _temp12), (_applyDecoratedDescriptor(_class$2.prototype, "get", [_dec$2], Object.getOwnPropertyDescriptor(_class$2.prototype, "get"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "put", [_dec2$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "put"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "post", [_dec3$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "post"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "patch", [_dec4$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "patch"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "delete", [_dec5$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "delete"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "delete", [_dec6$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "delete"), _class$2.prototype)), _class$2));
+  }, _temp$2), core.options(HttpOptions)(_temp$2.prototype, "get", 1), _temp2), _temp3), core.options(HttpOptions)(_temp3.prototype, "put", 1), _temp4), _temp5), core.options(HttpOptions)(_temp5.prototype, "post", 1), _temp6), _temp7), core.options(HttpOptions)(_temp7.prototype, "patch", 1), _temp8), _temp9), core.options(HttpOptions)(_temp9.prototype, "delete", 1), _temp10), _temp11), core.options(HttpOptions)(_temp11.prototype, "delete", 1), _temp12), (_applyDecoratedDescriptor(_class$2.prototype, "get", [_dec$2], Object.getOwnPropertyDescriptor(_class$2.prototype, "get"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "put", [_dec2$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "put"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "post", [_dec3$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "post"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "patch", [_dec4$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "patch"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "delete", [_dec5$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "delete"), _class$2.prototype), _applyDecoratedDescriptor(_class$2.prototype, "delete", [_dec6$1], Object.getOwnPropertyDescriptor(_class$2.prototype, "delete"), _class$2.prototype)), _class$2));
 
   function send(o, verb, request, response, options, composer) {
     var _options$pipeline;
@@ -331,13 +305,57 @@
     }
   }
 
-  mirukenCore.Handler.implement({
+  core.Handler.implement({
+    $httpGet(uri, configure) {
+      var get = new GetRequest();
+      configureRequest(uri, get, null, configure);
+      return this.$send(get);
+    },
+
+    $httpPut(uri, resource, configure) {
+      var put = new PutRequest();
+      configureRequest(uri, put, resource, configure);
+      return this.$send(put);
+    },
+
+    $httpPost(uri, resource, configure) {
+      var post = new PostRequest();
+      configureRequest(uri, post, resource, configure);
+      return this.$send(post);
+    },
+
+    $httpPatch(uri, resource, configure) {
+      var patch = new PatchRequest();
+      configureRequest(uri, patch, resource, configure);
+      return this.$send(patch);
+    },
+
+    $httpDelete(uri, configure) {
+      var remove = new DeleteRequest();
+      configureRequest(uri, remove, resource, configure);
+      return this.$send(remove);
+    }
+
+  });
+
+  function configureRequest(uri, request, resource, configure) {
+    request.resourceUri = uri;
+    request.resource = resource;
+
+    if (core.$isFunction(configure)) {
+      configure(request);
+    } else {
+      Object.assign(request, configure);
+    }
+  }
+
+  core.Handler.implement({
     $httpBasic(username, password) {
       return this.$httpPipeline([(request, composer, next) => {
-        if (mirukenCore.$isFunction(username)) {
+        if (core.$isFunction(username)) {
           var credential = username();
 
-          if (mirukenCore.$isPromise(credential)) {
+          if (core.$isPromise(credential)) {
             return credential.then(result => {
               basic(result == null ? void 0 : result.username, result == null ? void 0 : result.password, request);
               return next();
@@ -355,10 +373,10 @@
 
     $httpToken(token, scheme) {
       return this.$httpPipeline([(request, composer, next) => {
-        if (mirukenCore.$isFunction(token)) {
+        if (core.$isFunction(token)) {
           var credential = token();
 
-          if (mirukenCore.$isPromise(credential)) {
+          if (core.$isPromise(credential)) {
             return credential.then(result => {
               token(result == null ? void 0 : result.token, result == null ? void 0 : result.scheme, request);
               return next();
@@ -386,51 +404,31 @@
     request.headers = headers;
   }
 
-  mirukenCore.Handler.implement({
-    $httpGet(uri, configure) {
-      var get = new GetRequest();
-      configureRequest(uri, get, null, configure);
-      return this.send(get);
-    },
+  class HttpError extends Error {
+    constructor(statusCode, message, inner) {
+      if (!core.$isNumber(statusCode)) {
+        throw new TypeError("The statusCode must be a number.");
+      }
 
-    $httpPut(uri, resource, configure) {
-      var put = new PutRequest();
-      configureRequest(uri, put, resource, configure);
-      return this.send(put);
-    },
+      super(message || (inner == null ? void 0 : inner.message));
 
-    $httpPost(uri, resource, configure) {
-      var post = new PostRequest();
-      configureRequest(uri, post, resource, configure);
-      return this.send(post);
-    },
+      _defineProperty(this, "statusCode", void 0);
 
-    $httpPatch(uri, resource, configure) {
-      var patch = new PatchRequest();
-      configureRequest(uri, patch, resource, configure);
-      return this.send(patch);
-    },
+      _defineProperty(this, "content", void 0);
 
-    $httpDelete(uri, configure) {
-      var remove = new DeleteRequest();
-      configureRequest(uri, remove, resource, configure);
-      return this.send(remove);
+      _defineProperty(this, "inner", void 0);
+
+      this.statusCode = statusCode;
+      this.inner = inner;
+
+      if (Error.captureStackTrace) {
+        Error.captureStackTrace(this, this.constructor);
+      }
     }
 
-  });
-
-  function configureRequest(uri, request, resource, configure) {
-    request.resourceUri = uri;
-    request.resource = resource;
-
-    if (mirukenCore.$isFunction(configure)) {
-      configure(request);
-    } else {
-      Object.assign(request, configure);
-    }
   }
 
-  var _ = mirukenCore.createKey();
+  var _ = core.createKey();
 
   class UnknownPayloadError extends Error {
     constructor(payload) {
@@ -451,7 +449,7 @@
   }
 
   var _dec$3, _dec2$2, _dec3$2, _dec4$2, _class$3, _class2;
-  var HttpRouter = (_dec$3 = mirukenCore.provides(), _dec2$2 = mirukenCore.singleton(), _dec3$2 = mirukenCore.handles(mirukenCore.Routed), _dec4$2 = mirukenCore.routes("http", "https"), _dec$3(_class$3 = _dec2$2(_class$3 = (_class2 = class HttpRouter {
+  var HttpRouter = (_dec$3 = core.provides(), _dec2$2 = core.singleton(), _dec3$2 = core.handles(core.Routed), _dec4$2 = core.routes("http", "https"), _dec$3(_class$3 = _dec2$2(_class$3 = (_class2 = class HttpRouter {
     route(routed, {
       rawCallback,
       composer
@@ -461,7 +459,7 @@
       } = routed,
           uri = (rawCallback == null ? void 0 : rawCallback.isMany) === true ? "publish" : "process";
       return composer.$enableFilters().$mapOptions({
-        typeIdHandling: mirukenCore.TypeIdHandling.Auto
+        typeIdHandling: core.TypeIdHandling.Auto
       }).$httpPost(uri, {
         payload: message
       }, {
@@ -473,11 +471,11 @@
         return (_response$resource = response.resource) == null ? void 0 : _response$resource.payload;
       }).catch(error => {
         if (error instanceof HttpError) {
-          var {
-            payload
-          } = error.content;
+          var _error$content;
 
-          if (!mirukenCore.$isNothing(payload)) {
+          var payload = (_error$content = error.content) == null ? void 0 : _error$content.payload;
+
+          if (!core.$isNothing(payload)) {
             if (payload instanceof Error) throw payload;
             throw new UnknownPayloadError(payload);
           }
@@ -488,24 +486,6 @@
     }
 
   }, (_applyDecoratedDescriptor(_class2.prototype, "route", [_dec3$2, _dec4$2], Object.getOwnPropertyDescriptor(_class2.prototype, "route"), _class2.prototype)), _class2)) || _class$3) || _class$3);
-
-  var _dec$4, _class$4, _temp$3;
-  var HubOptions = (_dec$4 = mirukenCore.handlesOptions("hubOptions"), _dec$4(_class$4 = (_temp$3 = class HubOptions extends mirukenCore.Options {
-    constructor(...args) {
-      super(...args);
-
-      _defineProperty(this, "baseUrl", void 0);
-
-      _defineProperty(this, "protocol", void 0);
-
-      _defineProperty(this, "automaticReconnect", void 0);
-
-      _defineProperty(this, "serverTimeoutInMilliseconds", void 0);
-
-      _defineProperty(this, "keepAliveIntervalInMilliseconds", void 0);
-    }
-
-  }, _temp$3)) || _class$4);
 
   class HubConnectionInfo {
     constructor(id, url) {
@@ -577,136 +557,192 @@
 
   }
 
-  mirukenCore.Handler.implement({
+  core.Handler.implement({
     $hubConnect(url) {
-      return this.send(new HubConnect(url));
+      return this.$send(new HubConnect(url));
     },
 
     $hubDisconnect(url) {
-      return this.send(new HubDisconnect(url));
+      return this.$send(new HubDisconnect(url));
     }
 
   });
 
-  var _dec$5, _dec2$3, _dec3$3, _dec4$3, _dec5$2, _dec6$2, _class$5, _class2$1;
+  var _dec$4, _class$4, _temp$3;
+  var HubOptions = (_dec$4 = core.handlesOptions("hubOptions"), _dec$4(_class$4 = (_temp$3 = class HubOptions extends core.Options {
+    constructor(...args) {
+      super(...args);
 
-  var _$1 = mirukenCore.createKey();
+      _defineProperty(this, "baseUrl", void 0);
 
-  var HubRouter = (_dec$5 = mirukenCore.provides(), _dec2$3 = mirukenCore.singleton(), _dec3$3 = mirukenCore.handles(mirukenCore.Routed), _dec4$3 = mirukenCore.routes("hub"), _dec5$2 = mirukenCore.handles(HubConnect), _dec6$2 = mirukenCore.handles(HubDisconnect), _dec$5(_class$5 = _dec2$3(_class$5 = (_class2$1 = class HubRouter {
+      _defineProperty(this, "protocol", void 0);
+
+      _defineProperty(this, "transports", void 0);
+
+      _defineProperty(this, "automaticReconnect", void 0);
+
+      _defineProperty(this, "serverTimeoutInMilliseconds", void 0);
+
+      _defineProperty(this, "keepAliveIntervalInMilliseconds", void 0);
+    }
+
+  }, _temp$3)) || _class$4);
+
+  var _dec$5, _dec2$3, _dec3$3, _dec4$3, _dec5$2, _dec6$2, _class$5, _class2$1, _temp$4, _temp2$1, _temp3$1, _temp4$1, _temp5$1, _temp6$1, _temp7$1, _temp8$1, _temp9$1, _temp10$1, _temp11$1, _temp12$1;
+
+  var _$1 = core.createKey();
+
+  var HubRouter = (_dec$5 = core.provides(), _dec2$3 = core.singleton(), _dec3$3 = core.routes("hub"), _dec4$3 = core.handles(core.Routed), _dec5$2 = core.handles(HubConnect), _dec6$2 = core.handles(HubDisconnect), _dec$5(_class$5 = _dec2$3(_class$5 = (_class2$1 = (_temp12$1 = (_temp11$1 = (_temp10$1 = (_temp9$1 = (_temp8$1 = (_temp7$1 = (_temp6$1 = (_temp5$1 = (_temp4$1 = (_temp3$1 = (_temp2$1 = (_temp$4 = class HubRouter {
     constructor() {
       _$1(this).connections = new Map();
     }
 
-    async route(routed, {
+    async route(routed, hubOptions, httpOptions, {
       rawCallback,
       composer
     }) {
-      var url;
-
-      try {
-        url = new URL(routed.route);
-        url = url.pathname;
-      } catch {
-        return;
-      }
-
-      var connection = await getConnection(url, composer);
-      var payload = {
-        payload: routed.Message
-      },
-          mappper = composer.$enableFilters().$mapOptions({
-        typeIdHandling: mirukenCore.TypeIdHandling.Auto
-      }),
-          content = mapper.$mapFrom(payload, mirukenCore.JsonFormat);
+      var hub = routed.route.substring(4),
+          url = getHubEndpoint(hub, hubOptions, httpOptions);
+      var mapper = composer.$enableFilters().$mapOptions({
+        typeIdHandling: core.TypeIdHandling.Auto
+      });
+      var {
+        message
+      } = routed,
+          content = mapper.$mapFrom({
+        payload: message
+      }, core.JsonFormat);
+      var connection = await getConnection.call(this, url, hubOptions, httpOptions, composer);
 
       if (rawCallback != null && rawCallback.isMany) {
         await connection.send("Publish", content);
       } else {
         var result = await connection.invoke("Process", content),
-            response = mapper.$mapTo(result, mirukenCore.JsonFormat);
-        return response == null ? void 0 : response.payload;
+            response = mapper.$mapTo(result, core.JsonFormat, core.Try);
+        return response == null ? void 0 : response.fold(failure => {
+          var {
+            payload
+          } = failure;
+
+          if (payload instanceof Error) {
+            throw payload;
+          }
+
+          throw new UnknownPayloadError(payload);
+        }, success => success.payload);
       }
     }
 
-    async connect(connect, {
+    async connect(connect, hubOptions, httpOptions, {
       composer
     }) {
-      var connection = await getConnection.call(this, connect.url, composer, connect);
-      return getConnectionInfo(connection, connect.url);
+      var url = getHubEndpoint(connect.url, hubOptions, httpOptions);
+      var connection = await getConnection.call(this, url, hubOptions, httpOptions, composer, connect);
+      return getConnectionInfo(connection, url);
     }
 
-    async disconnect(disconnect) {
-      await disconnect.call(this, disconnect.url);
+    async disconnect(disconnect, hubOptions, httpOptions) {
+      var url = getHubEndpoint(disconnect.url, hubOptions, httpOptions);
+      await disconnectHub.call(this, url);
     }
 
-  }, (_applyDecoratedDescriptor(_class2$1.prototype, "route", [_dec3$3, _dec4$3], Object.getOwnPropertyDescriptor(_class2$1.prototype, "route"), _class2$1.prototype), _applyDecoratedDescriptor(_class2$1.prototype, "connect", [_dec5$2], Object.getOwnPropertyDescriptor(_class2$1.prototype, "connect"), _class2$1.prototype), _applyDecoratedDescriptor(_class2$1.prototype, "disconnect", [_dec6$2], Object.getOwnPropertyDescriptor(_class2$1.prototype, "disconnect"), _class2$1.prototype)), _class2$1)) || _class$5) || _class$5);
+  }, _temp$4), core.options(HubOptions)(_temp$4.prototype, "route", 1), _temp2$1), _temp3$1), core.options(HttpOptions)(_temp3$1.prototype, "route", 2), _temp4$1), _temp5$1), core.options(HubOptions)(_temp5$1.prototype, "connect", 1), _temp6$1), _temp7$1), core.options(HttpOptions)(_temp7$1.prototype, "connect", 2), _temp8$1), _temp9$1), core.options(HubOptions)(_temp9$1.prototype, "disconnect", 1), _temp10$1), _temp11$1), core.options(HttpOptions)(_temp11$1.prototype, "disconnect", 2), _temp12$1), (_applyDecoratedDescriptor(_class2$1.prototype, "route", [_dec3$3, _dec4$3], Object.getOwnPropertyDescriptor(_class2$1.prototype, "route"), _class2$1.prototype), _applyDecoratedDescriptor(_class2$1.prototype, "connect", [_dec5$2], Object.getOwnPropertyDescriptor(_class2$1.prototype, "connect"), _class2$1.prototype), _applyDecoratedDescriptor(_class2$1.prototype, "disconnect", [_dec6$2], Object.getOwnPropertyDescriptor(_class2$1.prototype, "disconnect"), _class2$1.prototype)), _class2$1)) || _class$5) || _class$5);
 
-  function getConnectionInfo(connection, url) {
-    return new signalr.HubConnectionInfo(connection.connectionId, url);
+  function getHubEndpoint(url, hubOptions, httpOptions) {
+    var baseUrl = (hubOptions == null ? void 0 : hubOptions.baseUrl) || (httpOptions == null ? void 0 : httpOptions.baseUrl);
+
+    try {
+      return new URL(url, baseUrl).href;
+    } catch {
+      return url; // relative url ???
+    }
   }
 
-  async function getConnection(url, composer, connect) {
-    var options = composer.$getOptions(HubOptions) || new HubOptions(),
-        {
-      baseUrl,
-      protocol,
-      automaticReconnect
-    } = options;
-    url = url || options.baseUrl;
-    if (mirukenCore.$isNothing(url)) throw new Error("The url argument is required.");
+  function getConnectionInfo(connection, url) {
+    return new HubConnectionInfo(connection.connectionId, url);
+  }
 
+  async function getConnection(url, hubOptions, httpOptions, composer, connect) {
     var connections = _$1(this).connections;
 
-    var connection = _$1(this).connections.get(url);
+    var connection = connections.get(url);
 
-    if (!mirukenCore.$isNothing && connection.state != signalr.HubConnectionState.Disconnected) {
-      if (!mirukenCore.$isNothing(connect)) {
+    if (!core.$isNothing(connection) && connection.state != signalR.HubConnectionState.Disconnected) {
+      if (!core.$isNothing(connect)) {
         throw new Error(`A connection to the Hub @ ${url} already exists.`);
       }
+
+      return connection;
     }
 
-    await disconnect.call(this, url);
-    var builder = new signalr.HubConnectionBuilder().withUrl(url);
+    await disconnectHub.call(this, url);
+    var {
+      protocol,
+      transports,
+      automaticReconnect,
+      serverTimeoutInMilliseconds,
+      keepAliveIntervalInMilliseconds
+    } = hubOptions || {};
+    var builder = new signalR.HubConnectionBuilder();
+    builder = core.$isNothing(transports) ? builder.withUrl(url) : builder.withUrl(url, transports);
 
-    if (!mirukenCore.$isNothing(protocol)) {
+    if (!core.$isNothing(protocol)) {
       builder = builder.withHubProtocol(protocol);
     }
 
-    if (!mirukenCore.$isNothing(automaticReconnect)) {
-      builder = builder.withAutomaticReconnect(automaticReconnect);
+    if (!core.$isNothing(automaticReconnect)) {
+      if (automaticReconnect === true) {
+        builder = builder.withAutomaticReconnect();
+      } else if (automaticReconnect !== false) {
+        builder = builder.withAutomaticReconnect(automaticReconnect);
+      }
+    }
+
+    if (!core.$isNothing(httpOptions)) {
+      builder.httpConnectionOptions = {
+        withCredentials: httpOptions == null ? void 0 : httpOptions.withCredentials
+      };
     }
 
     connection = builder.build();
-    var {
-      serverTimeoutInMilliseconds,
-      keepAliveIntervalInMilliseconds
-    } = options;
 
-    if (!mirukenCore.$isNothing(serverTimeoutInMilliseconds)) {
+    if (!core.$isNothing(serverTimeoutInMilliseconds)) {
       connection.serverTimeoutInMilliseconds = serverTimeoutInMilliseconds;
     }
 
-    if (!mirukenCore.$isNothing(keepAliveIntervalInMilliseconds)) {
+    if (!core.$isNothing(keepAliveIntervalInMilliseconds)) {
       connection.keepAliveIntervalInMilliseconds = keepAliveIntervalInMilliseconds;
     }
 
+    var connectionInfo = getConnectionInfo(connection, url),
+        mapper = composer.$mapOptions({
+      typeIdHandling: core.TypeIdHandling.Auto
+    }),
+        notify = composer.$notify();
+    connection.onclose(async error => {
+      notify.$send(new HubClosed(connectionInfo, error));
+
+      if (core.$isNothing(error)) {
+        await disconnectHub.call(this, url);
+      } else {
+        await connectWithInitialRetry.call(this, connection, url);
+      }
+    });
     connection.on("Process", message => {
       var {
         payload
-      } = composer.$enableFilters().$mapOptions({
-        typeIdHandling: mirukenCore.TypeIdHandling.Auto
-      });
-      composer.$with(getConnectionInfo(connection, url)).$with(connection).send(payload);
+      } = mapper.$mapTo(message, core.JsonFormat);
+      composer.$with(connectionInfo).$with(connection).$send(payload);
     });
     connection.on("Publish", message => {
       var {
         payload
-      } = composer.$enableFilters().$mapOptions({
-        typeIdHandling: mirukenCore.TypeIdHandling.Auto
-      });
-      composer.$with(getConnectionInfo(connection, url)).$with(connection).publish(payload);
+      } = mapper.$mapTo(message, core.JsonFormat);
+      composer.$with(connectionInfo).$with(connection).$publish(payload);
     });
-    await connectWithInitialRetry.call(this, connection.url);
+    await connectWithInitialRetry.call(this, connection, url);
+    connection.onreconnecting(error => notify.$send(new HubReconnecting(connectionInfo, error)));
+    connection.onreconnected(connectionId => notify.$send(new HubReconnected(connectionInfo, connectionId)));
     connections.set(url, connection);
     return connection;
   }
@@ -715,38 +751,44 @@
     var start = Date.now();
 
     while (true) {
-      if (Date.now() - start > 30000) {
-        throw new Error(`Unable to connect to the Hub at ${url}.`);
-      }
-
       try {
         await connection.start();
-      } catch {
+        return;
+      } catch (error) {
+        if (Date.now() - start > 10000) {
+          throw new Error(`Unable to connect to the Hub at ${url}: ${error.message}`);
+        }
+
         await Promise.delay(5000);
-        await connectWithInitialRetry(connection, url);
       }
     }
   }
 
-  async function disconnect(url) {
-    if (mirukenCore.$isNothing(url)) throw new Error("The url argument is required.");
+  async function disconnectHub(url) {
+    if (core.$isNothing(url)) throw new Error("The url argument is required.");
 
-    var connection = _$1(this).connections.get(url);
+    var connections = _$1(this).connections,
+        connection = connections.get(url);
 
-    if (!mirukenCore.$isNothing(connection)) {
-      await connection.stop();
+    if (!core.$isNothing(connection)) {
+      connections.delete(url);
+
+      try {
+        await connection.stop();
+      } catch {// ignore
+      }
     }
   }
 
-  mirukenCore.HandlerBuilder.implement({
+  core.HandlerBuilder.implement({
     withSignalR() {
-      return this.addTypes(from => from.types(mirukenCore.JsonMapping, HubRouter));
+      return this.addTypes(from => from.types(core.JsonMapping, HubRouter)).withValidation();
     }
 
   });
 
   var _dec$6, _dec2$4, _class$6;
-  var XMLHttpRequestHandler = (_dec$6 = mirukenCore.provides(), _dec2$4 = mirukenCore.singleton(), _dec$6(_class$6 = _dec2$4(_class$6 = class XMLHttpRequestHandler extends HttpHandler {
+  var XMLHttpRequestHandler = (_dec$6 = core.provides(), _dec2$4 = core.singleton(), _dec$6(_class$6 = _dec2$4(_class$6 = class XMLHttpRequestHandler extends HttpHandler {
     sendRequest(verb, url, request, response, options, composer) {
       var xhr = new XMLHttpRequest(),
           {
@@ -761,8 +803,8 @@
       } = options || {};
       xhr.timeout = timeout;
       xhr.withCredentials = withCredentials;
-      xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
       xhr.open(verb, url.href);
+      xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
       setResponseType(xhr, responseType);
       var promise = new Promise((resolve, reject) => {
         xhr.onload = () => {
@@ -775,7 +817,7 @@
                 content = getResponse(xhr, _contentType);
 
             if (status >= 200 && status < 300) {
-              if (!(mirukenCore.$isNothing(content) || mirukenCore.$isNothing(_contentType) || xhr.responseType !== "")) {
+              if (!(core.$isNothing(content) || core.$isNothing(_contentType) || xhr.responseType !== "")) {
                 response.resource = composer.$mapTo(content, _contentType, responseType);
               } else {
                 response.resource = content;
@@ -787,7 +829,7 @@
             } else {
               var error;
 
-              if (!(mirukenCore.$isNothing(content) || mirukenCore.$isNothing(_contentType))) {
+              if (!(core.$isNothing(content) || core.$isNothing(_contentType))) {
                 var errorContent = composer.$bestEffort().$mapTo(content, _contentType) || content;
 
                 if (errorContent instanceof Error) {
@@ -810,32 +852,41 @@
         };
 
         xhr.ontimeout = () => {
-          reject(new mirukenCore.TimeoutError(request, "A timeout occurred during an XMLHttpRequest."));
+          reject(new core.TimeoutError(request, "A timeout occurred during an XMLHttpRequest."));
         };
 
         xhr.onabort = () => {
-          reject(new mirukenCore.RejectedError(request, "The XMLHttpRequest has been aborted."));
+          reject(new core.RejectedError(request, "The XMLHttpRequest has been aborted."));
         };
       });
       var body;
 
-      if (!mirukenCore.$isNothing(resource)) {
+      if (!core.$isNothing(resource)) {
         body = getBody(resource, false);
 
-        if (mirukenCore.$isNothing(body) && mirukenCore.$isObject(resource)) {
+        if (core.$isNothing(body) && core.$isObject(resource)) {
           var content = composer.$mapFrom(resource, contentType);
           body = getBody(content, true);
         }
 
-        if (mirukenCore.$isNothing(body)) {
+        if (core.$isNothing(body)) {
           return Promise.reject(request, new Error("Unsupported http content."));
         }
       }
 
-      if (!mirukenCore.$isNothing(headers)) {
+      if (!core.$isNothing(headers)) {
         Reflect.ownKeys(headers).forEach(header => xhr.setRequestHeader(header, headers[header]));
       }
 
+      var optionHeaders = options == null ? void 0 : options.headers;
+
+      if (!core.$isNothing(optionHeaders)) {
+        Reflect.ownKeys(optionHeaders).forEach(header => {
+          if (!(headers != null && headers.hasOwnProperty(header))) {
+            xhr.setRequestHeader(header, optionHeaders[header]);
+          }
+        });
+      }
       xhr.send(body);
       return promise;
     }
@@ -843,7 +894,7 @@
   }) || _class$6) || _class$6);
 
   function getBody(resource, json) {
-    if (mirukenCore.$isString(resource) || resource instanceof Document || TypeHelper.isFormData(resource) || TypeHelper.isArrayBuffer(resource) || TypeHelper.isBlob(resource)) {
+    if (core.$isString(resource) || resource instanceof Document || TypeHelper.isFormData(resource) || TypeHelper.isArrayBuffer(resource) || TypeHelper.isBlob(resource)) {
       return resource;
     }
 
@@ -851,7 +902,7 @@
       return resource.toString();
     }
 
-    if (json && mirukenCore.$isPlainObject(resource)) {
+    if (json && core.$isPlainObject(resource)) {
       return JSON.stringify(resource);
     }
   }
@@ -874,17 +925,17 @@
     }
 
     var response = xhr.responseXML;
-    if (!mirukenCore.$isNothing(response)) return response;
+    if (!core.$isNothing(response)) return response;
     response = xhr.response;
 
-    if (!mirukenCore.$isNothing(response)) {
+    if (response) {
       return JSON.parse(response);
     }
   }
 
   function createResponseHeaders(xhr) {
     var headers = xhr.getAllResponseHeaders();
-    if (mirukenCore.$isNothing(headers)) return;
+    if (core.$isNothing(headers)) return;
     var headerMap = {},
         lines = headers.trim().split(/[\r\n]+/);
     lines.forEach(line => {
@@ -896,9 +947,9 @@
     return headerMap;
   }
 
-  mirukenCore.HandlerBuilder.implement({
+  core.HandlerBuilder.implement({
     withXMLHttpRequestClient() {
-      return this.addTypes(from => from.types(mirukenCore.JsonMapping, HttpRouter, XMLHttpRequestHandler, ErrorMapping));
+      return this.addTypes(from => from.types(core.JsonMapping, HttpRouter, XMLHttpRequestHandler, ErrorMapping)).withValidation();
     }
 
   });
@@ -940,4 +991,4 @@
 
   Object.defineProperty(exports, '__esModule', { value: true });
 
-})));
+});
