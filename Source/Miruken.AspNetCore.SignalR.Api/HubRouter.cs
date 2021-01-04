@@ -5,6 +5,10 @@
     using System.Threading;
     using System.Threading.Tasks;
     using Callback;
+    using Functional;
+    using Http;
+    using Http.Format;
+    using Map;
     using Microsoft.AspNetCore.SignalR.Client;
     using Microsoft.Extensions.DependencyInjection;
     using Miruken.Api;
@@ -41,11 +45,24 @@
             var message = new HubMessage(routed.Message);
 
             if (command.Many)
-                await connection.InvokeAsync(Publish, message);
+                await connection.SendAsync(Publish, message);
             else
             {
-                var response = await connection.InvokeAsync<HubMessage>(Process, message);
-                return response?.Payload;
+                var response = await connection.InvokeAsync<Try<HubMessage, HubMessage>>(Process, message);
+                return response.Match(
+                    failure =>
+                    {
+                        var payload = failure.Payload;
+                        throw payload switch
+                        {
+                            null => new Exception("An unexpected error has occurred."),
+                            Exception exception => exception,
+                            _ => composer.BestEffort()
+                                     .Map<Exception>(payload, typeof(Exception)) 
+                                 ?? new UnknownExceptionPayload(payload)
+                        };
+                    },
+                    success => success.Payload);
             }
 
             return null;
@@ -108,8 +125,9 @@
 
             connectionBuilder = connectionBuilder.AddNewtonsoftJsonProtocol(json =>
                 {
-                    json.PayloadSerializerSettings =
-                        Http.HttpFormatters.Route.SerializerSettings;
+                    var settings = HttpFormatters.Route.SerializerSettings.Copy();
+                    settings.Converters.Add(new ExceptionJsonConverter(composer));
+                    json.PayloadSerializerSettings = settings;
                 });
 
             connection = connectionBuilder.Build();

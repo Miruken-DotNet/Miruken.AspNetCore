@@ -24,12 +24,7 @@
 
         private static readonly NewtonsoftJsonSerializer JsonSerializer =
             NewtonsoftJsonSerializer.Create(HttpFormatters.Route.SerializerSettings);
-
-        public class Message
-        {
-            public object Payload { get; set; }
-        }
-
+        
         public MessageHub(IHandler handler)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
