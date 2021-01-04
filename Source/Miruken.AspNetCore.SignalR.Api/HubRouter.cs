@@ -42,13 +42,13 @@
 
             var connection = await GetConnection(url, composer);
 
-            var message = new HubMessage(routed.Message);
+            var message = new Message(routed.Message);
 
             if (command.Many)
                 await connection.SendAsync(Publish, message);
             else
             {
-                var response = await connection.InvokeAsync<Try<HubMessage, HubMessage>>(Process, message);
+                var response = await connection.InvokeAsync<Try<Message, Message>>(Process, message);
                 return response.Match(
                     failure =>
                     {
@@ -158,12 +158,12 @@
                     await ConnectWithRetryAsync(connection, url);
             };
 
-            connection.On<HubMessage>(Process, message => composer
+            connection.On<Message>(Process, message => composer
                 .With(GetConnectionInfo(connection, url))
                 .With(connection)
                 .Send(message.Payload));
 
-            connection.On<HubMessage>(Publish, message => composer
+            connection.On<Message>(Publish, message => composer
                 .With(GetConnectionInfo(connection, url))
                 .With(connection)
                 .Publish(message.Payload));
