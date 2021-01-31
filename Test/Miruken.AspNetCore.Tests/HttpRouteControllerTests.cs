@@ -17,7 +17,6 @@
     using Newtonsoft.Json;
     using Register;
     using Validate;
-    using ServiceCollection = Microsoft.Extensions.DependencyInjection.ServiceCollection;
 
 #if NETSTANDARD2_0
     using Microsoft.AspNetCore;
