@@ -61,10 +61,14 @@
         }
 
         [HttpPost, Route("publish/{*rest}", Name = "Publish")]
-        public async Task<IActionResult> Publish([FromBody]Message message)
+        public async Task<IActionResult> Publish([HttpRouteBody]Message message)
         {
             var settings = CreateSerializerSettings();
-
+            
+            // Since it a publish (best effort), just ignore errors
+            if (message == null)
+                return CreateResult(new Message(), settings);
+            
             if (!ModelState.IsValid)
                 return CreateInvalidResult(settings);
 

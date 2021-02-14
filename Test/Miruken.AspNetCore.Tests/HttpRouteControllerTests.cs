@@ -119,7 +119,37 @@
             Assert.AreEqual("Philippe Coutinho", response.Player.Name);
             Assert.IsTrue(response.Player.Id > 0);
         }
-
+        
+        [TestMethod]
+        public async Task Should_Route_Publish_Requests()
+        {
+            var player = new Player
+            {
+                Name = "Philippe Coutinho"
+            };
+            await _handler
+                .Publish(new PlayerCreated { Player = player }
+                    .RouteTo(_server.BaseAddress.AbsoluteUri));
+        }
+        
+        [TestMethod]
+        public async Task Should_Ignore_Unknown_Publish_Requests()
+        {
+            var response = await _handler
+                .Formatters(HttpFormatters.Route)
+                .HttpPost<string, Try<Message, Message>>(
+                    @"{
+                       'payload': {
+                           '$type': 'Miruken.AspNetCore.Tests.SomethingHappened, Miruken.AspNetCore.Tests'
+                        }
+                    }", _server.BaseAddress.AbsoluteUri + "Publish",
+                    HttpFormatters.Route);
+            response.Match(error =>
+            {
+                Assert.Fail("Should have succeeded");
+            }, _ => {  });
+        }
+        
         [TestMethod,
          ExpectedException(typeof(NotFoundException))]
         public async Task Should_Fail_Unhandled_Requests()
