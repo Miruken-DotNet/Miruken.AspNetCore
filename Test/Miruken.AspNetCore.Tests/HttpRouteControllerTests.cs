@@ -17,15 +17,7 @@
     using Newtonsoft.Json;
     using Register;
     using Validate;
-
-#if NETSTANDARD2_0
-    using Microsoft.AspNetCore;
-    using Microsoft.AspNetCore.Mvc;
-#endif
-
-#if NETSTANDARD2_1
     using Microsoft.Extensions.Hosting;
-#endif
 
     [TestClass]
     public class HttpRouteControllerTests
@@ -55,10 +47,6 @@
 
         protected virtual TestServer CreateTestServer()
         {
-#if NETSTANDARD2_0
-            var builder = WebHost.CreateDefaultBuilder().UseStartup<Startup>();
-            return new TestServer(builder);
-#elif NETSTANDARD2_1
             var host = Host.CreateDefaultBuilder()
                 .ConfigureWebHostDefaults(webBuilder =>
                     webBuilder.UseStartup<Startup>().UseTestServer())
@@ -66,24 +54,10 @@
                 .Build();
             host.RunAsync();
             return host.GetTestServer();
-#endif
         }
 
         private class Startup
         {
-#if NETSTANDARD2_0
-            public IServiceProvider ConfigureServices(IServiceCollection services)
-            {
-                services.AddMvc()
-                    .SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
-
-                return services.AddMiruken(configure => configure
-                    .Sources(sources => sources.FromAssemblyOf<Startup>())
-                    .WithAspNet(options => options.AddControllers())
-                    .WithValidation())
-                    .Build();
-            }
-#elif NETSTANDARD2_1
             public void ConfigureServices(IServiceCollection services)
             {
                 services.AddMvcCore();
@@ -93,16 +67,11 @@
                     .WithAspNet(options => options.AddControllers())
                     .WithValidation());
             }
-#endif
 
             public void Configure(IApplicationBuilder app)
             {
-#if NETSTANDARD2_0
-                app.UseMvc();
-#elif NETSTANDARD2_1
                 app.UseRouting()
                    .UseEndpoints(endpoints => endpoints.MapControllers());
-#endif
             }
         }
         

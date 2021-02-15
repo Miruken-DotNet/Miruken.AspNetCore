@@ -23,17 +23,10 @@
             ILoggerFactory loggerFactory, ArrayPool<char> charPool,
             ObjectPoolProvider objectPoolProvider)
         {
-#if NETSTANDARD2_0
-            _input = new JsonInputFormatter(
-                loggerFactory.CreateLogger(typeof(HttpRouteBodyModelBinder)),
-                HttpFormatters.Route.SerializerSettings, charPool,
-                objectPoolProvider, new MvcOptions(), new MvcJsonOptions());
-#elif NETCOREAPP3_0
             _input = new NewtonsoftJsonInputFormatter(
                 loggerFactory.CreateLogger(typeof(HttpRouteBodyModelBinder)),
                 HttpFormatters.Route.SerializerSettings, charPool,
                 objectPoolProvider, new MvcOptions(), new MvcNewtonsoftJsonOptions());
-#endif
             _readerFactory = readerFactory.CreateReader;         
         }
 

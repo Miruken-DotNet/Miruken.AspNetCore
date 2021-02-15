@@ -1,5 +1,4 @@
-﻿#if NETSTANDARD2_1
-namespace Miruken.AspNetCore.Swagger
+﻿namespace Miruken.AspNetCore.Swagger
 {
     using System;
     using System.Collections.Generic;
@@ -28,7 +27,7 @@ namespace Miruken.AspNetCore.Swagger
          BindingFlags.Static | BindingFlags.NonPublic);
 
         private static readonly JsonSerializerSettings SerializerSettings
-            = new JsonSerializerSettings
+            = new()
             {
                 Formatting                     = Formatting.Indented,
                 NullValueHandling              = NullValueHandling.Ignore,
@@ -137,14 +136,15 @@ namespace Miruken.AspNetCore.Swagger
                     Summary     = requestSchema.Description,
                     OperationId = requestType.FullName,
                     Description = handlerNotes,
-                    Tags        = new List<OpenApiTag> { new OpenApiTag { Name = tag } },
+                    Tags        = new List<OpenApiTag> { new() { Name = tag } },
                     RequestBody = new OpenApiRequestBody
                     {
                         Description = "request to process",
                         Content     = JsonFormats.Select(f =>
                             new { Format = f, Media = new OpenApiMediaType
                             {
-                                Schema = requestSchema
+                                Schema  = requestSchema,
+                                Example = requestSchema.Example
                             } }).ToDictionary(f => f.Format, f => f.Media),
                         Required = true
                     },
@@ -157,7 +157,8 @@ namespace Miruken.AspNetCore.Swagger
                                 Content = JsonFormats.Select(f =>
                                     new { Format = f, Media = new OpenApiMediaType
                                     {
-                                        Schema = responseSchema
+                                        Schema  = responseSchema,
+                                        Example = responseSchema.Example
                                     } }).ToDictionary(f => f.Format, f => f.Media)
                             }
                         },
@@ -195,23 +196,27 @@ namespace Miruken.AspNetCore.Swagger
 
             if (message == null || message == typeof(void) || message == typeof(object))
             {
-                return repository.GetOrAdd(
-                    typeof(Message),
-                    ModelToSchemaId(typeof(Message)), () =>
-                    {
-                        var s = generator.GenerateSchema(typeof(Message), repository);
-                        s.Example = CreateExampleJson(new Message());
-                        return s;
-                    });
+                if (!repository.TryLookupByType(typeof(Message), out var messageSchema))
+                {
+                    var schemaId = ModelToSchemaId(typeof(Message));
+                    repository.RegisterType(message, schemaId);
+                    messageSchema = generator.GenerateSchema(typeof(Message), repository);
+                    repository.AddDefinition(schemaId, messageSchema);
+                    messageSchema.Example = CreateExampleJson(new Message());
+                }
+                return messageSchema;
             }
 
             var genericMessage = typeof(Message<>).MakeGenericType(message);
-            return repository.GetOrAdd(genericMessage, ModelToSchemaId(genericMessage), () =>
+            if (!repository.TryLookupByType(genericMessage, out var schema))
             {
-                var s = generator.GenerateSchema(genericMessage, repository);
-                s.Example = CreateExampleMessage(message);
-                return s;
-            });
+                var schemaId = ModelToSchemaId(genericMessage);
+                repository.RegisterType(genericMessage, schemaId);
+                schema = generator.GenerateSchema(genericMessage, repository);
+                repository.AddDefinition(schemaId, schema);
+                schema.Example = CreateExampleMessage(message);
+            }
+            return schema;
         }
 
         private IOpenApiAny CreateExampleMessage(Type message)
@@ -236,7 +241,7 @@ namespace Miruken.AspNetCore.Swagger
 
         private static Message<T> CreateExample<T>(ISpecimenBuilder builder)
         {
-            return new Message<T> { Payload = builder.Create<T>() };
+            return new() { Payload = builder.Create<T>() };
         }
 
         private static Fixture CreateExamplesGenerator()
@@ -261,5 +266,5 @@ namespace Miruken.AspNetCore.Swagger
         public ValidationErrors[] Nested       { get; set; }
     }
 }
-#endif
+
 

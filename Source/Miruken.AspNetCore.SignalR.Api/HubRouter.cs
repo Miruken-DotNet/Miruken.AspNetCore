@@ -18,7 +18,7 @@
     public class HubRouter : Handler, IDisposable, IAsyncDisposable
     {
         private readonly ConcurrentDictionary<Uri, HubConnection>
-            _connections = new ConcurrentDictionary<Uri, HubConnection>();
+            _connections = new();
 
         private const string Process = "Process";
         private const string Publish = "Publish";
@@ -239,7 +239,7 @@
             HubConnection connection,
             Uri           url)
         {
-            return new HubConnectionInfo(url)
+            return new(url)
                 {
                     Id = connection.ConnectionId
                 };

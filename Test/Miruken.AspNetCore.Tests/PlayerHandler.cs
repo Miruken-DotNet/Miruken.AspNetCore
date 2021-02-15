@@ -14,7 +14,7 @@
     public class PlayerHandler : Handler
     {
         private static int _id;
-        private readonly Dictionary<int, Player> _players = new Dictionary<int, Player>();
+        private readonly Dictionary<int, Player> _players = new();
 
         [Handles]
         public PlayerResponse Get(GetPlayer get)

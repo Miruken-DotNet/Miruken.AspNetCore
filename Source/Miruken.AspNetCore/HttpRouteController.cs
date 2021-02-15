@@ -96,12 +96,6 @@
         private static IActionResult CreateResult(object value,
             JsonSerializerSettings settings, int? statusCode = null)
         {
-#if NETSTANDARD2_0
-            return new JsonResult(value, settings) 
-            {
-                StatusCode = statusCode
-            };
-#elif NETCOREAPP3_0
             return new ObjectResult(value)
             {
                 Formatters = {
@@ -110,7 +104,6 @@
                 },
                 StatusCode = statusCode
             };
-#endif
         }
 
         private IActionResult CreateErrorResult(Exception exception,
