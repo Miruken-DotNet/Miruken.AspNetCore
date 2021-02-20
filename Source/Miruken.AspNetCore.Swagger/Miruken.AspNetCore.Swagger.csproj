@@ -23,10 +23,10 @@
 
   <ItemGroup>
     <PackageReference Include="AutoFixture" Version="4.15.0" />
-    <PackageReference Include="Miruken" Version="4.1.7-Alpha.0" />
-    <PackageReference Include="Miruken.Http" Version="4.1.7-Alpha.0" />
+    <PackageReference Include="Miruken" Version="5.0.0" />
+    <PackageReference Include="Miruken.Http" Version="5.0.0" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.0-beta-20204-02" PrivateAssets="All" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.0.5" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.0.7" />
   </ItemGroup>
   
 </Project>
