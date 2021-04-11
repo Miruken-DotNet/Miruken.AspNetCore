@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Concurrent;
+    using System.Diagnostics.CodeAnalysis;
     using System.Threading;
     using System.Threading.Tasks;
     using Callback;
@@ -83,6 +84,7 @@
             return Disconnect(disconnect.Url, true);
         }
 
+        [SuppressMessage("ReSharper", "ParameterOnlyUsedForPreconditionCheck.Local")]
         private async Task<HubConnection> GetConnection(
             Uri        url,
             IHandler   composer,
@@ -145,11 +147,11 @@
 
             connection.Closed += async exception =>
             {
-                var closed = new HubClosed
-                {
-                    ConnectionInfo = GetConnectionInfo(connection, url),
-                    Exception      = exception
-                };
+                var closed = new HubClosed(
+                    GetConnectionInfo(connection, url),
+                    exception
+                );
+                
                 await notify.Send(closed);
 
                 if (exception != null)
@@ -169,20 +171,18 @@
                 .Publish(message.Payload));
 
             await ConnectWithRetryAsync(connection, url);
-            
+
             connection.Reconnecting += exception => notify.Send(
-                new HubReconnecting
-                {
-                    ConnectionInfo = GetConnectionInfo(connection, url),
-                    Exception      = exception
-                });
-            
+                new HubReconnecting(
+                    GetConnectionInfo(connection, url),
+                    exception
+                ));
+
             connection.Reconnected += connectionId => notify.Send(
-                new HubReconnected
-                {
-                    ConnectionInfo  = GetConnectionInfo(connection, url),
-                    NewConnectionId = connectionId
-                });
+                new HubReconnected(
+                    GetConnectionInfo(connection, url),
+                    connectionId
+                ));
 
             _connections[url] = connection;
             return connection;
@@ -239,10 +239,7 @@
             HubConnection connection,
             Uri           url)
         {
-            return new(url)
-                {
-                    Id = connection.ConnectionId
-                };
+            return new(url, connection.ConnectionId);
         }
         
         public async ValueTask DisposeAsync()

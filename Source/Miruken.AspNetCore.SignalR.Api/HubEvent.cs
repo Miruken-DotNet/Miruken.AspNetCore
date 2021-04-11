@@ -1,7 +1,4 @@
 ﻿namespace Miruken.AspNetCore.SignalR.Api
 {
-    public abstract class HubEvent
-    {
-        public HubConnectionInfo ConnectionInfo { get; set; }
-    }
+    public abstract record HubEvent(HubConnectionInfo ConnectionInfo = null);
 }

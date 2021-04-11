@@ -29,14 +29,13 @@
                     d => d.ServiceType == typeof(ApplicationPartManager))
                 ?.ImplementationInstance as ApplicationPartManager;
 
-            if (_parts != null)
+            if (_parts == null) return;
+            
+            var assembly = typeof(HttpRouteController).Assembly;
+            if (_parts.ApplicationParts.OfType<AssemblyPart>()
+                .All(p => p.Assembly != assembly))
             {
-                var assembly = typeof(HttpRouteController).Assembly;
-                if (!_parts.ApplicationParts.OfType<AssemblyPart>()
-                    .Any(p => p.Assembly == assembly))
-                {
-                    _parts.ApplicationParts.Add(new AssemblyPart(assembly));
-                }
+                _parts.ApplicationParts.Add(new AssemblyPart(assembly));
             }
         }
 

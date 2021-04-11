@@ -72,7 +72,7 @@
             if (!ModelState.IsValid)
                 return CreateInvalidResult(settings);
 
-            var notification = message?.Payload;
+            var notification = message.Payload;
             if (notification == null)
             {
                 return CreateErrorResult(new ArgumentException(

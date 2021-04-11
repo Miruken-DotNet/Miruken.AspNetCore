@@ -2,17 +2,5 @@
 {
     using System;
 
-    public class HubDisconnect
-    {
-        public HubDisconnect()
-        {
-        }
-
-        public HubDisconnect(Uri url)
-        {
-            Url = url ?? throw new ArgumentNullException(nameof(url));
-        }
-
-        public Uri Url { get; set; }
-    }
+    public record HubDisconnect(Uri Url = null);
 }

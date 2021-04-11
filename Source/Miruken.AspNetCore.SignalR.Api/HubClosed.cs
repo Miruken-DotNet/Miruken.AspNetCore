@@ -2,8 +2,8 @@
 {
     using System;
 
-    public class HubClosed : HubEvent
-    {
-        public Exception Exception { get; set; }
-    }
+    public record HubClosed(
+        HubConnectionInfo ConnectionInfo,
+        Exception         Exception
+    ) : HubEvent(ConnectionInfo);
 }

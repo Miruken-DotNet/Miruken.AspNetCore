@@ -286,7 +286,7 @@
                         var outcome = vex.Outcome;
                         Assert.IsNotNull(outcome);
                         CollectionAssert.AreEqual(new[] { "Player" }, outcome.Culprits);
-                        Assert.AreEqual("'Player. Name' must not be empty.", outcome["Player.Name"]);
+                        Assert.AreEqual("'Player Name' must not be empty.", outcome["Player.Name"]);
                     })
                     .Catch((ex, s) => Assert.Fail("Unexpected exception")));
             Assert.AreEqual(1, results.Length);
