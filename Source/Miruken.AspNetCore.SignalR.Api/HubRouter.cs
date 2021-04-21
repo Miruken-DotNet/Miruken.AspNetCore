@@ -16,7 +16,7 @@
     using Miruken.Api.Route;
 
     [Routes("hub")]
-    public class HubRouter : Handler, IDisposable, IAsyncDisposable
+    public class HubRouter : Handler, IAsyncDisposable
     {
         private readonly ConcurrentDictionary<Uri, HubConnection>
             _connections = new();
@@ -255,11 +255,6 @@
                     // Ignore
                 }
             }
-        }
-        
-        public void Dispose()
-        {   
-            DisposeAsync().GetAwaiter().GetResult();
         }
     }
 }
