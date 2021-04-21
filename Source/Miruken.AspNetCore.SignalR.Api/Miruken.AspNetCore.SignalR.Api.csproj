@@ -24,8 +24,8 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="5.0.5" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.0-beta-20204-02" PrivateAssets="All" />
-    <PackageReference Include="Miruken" Version="5.0.1-Alpha.2" />
-    <PackageReference Include="Miruken.Http" Version="5.0.1-Alpha.2" />
+    <PackageReference Include="Miruken" Version="5.0.1-Alpha.3" />
+    <PackageReference Include="Miruken.Http" Version="5.0.1-Alpha.3" />
   </ItemGroup>
 
 </Project>
