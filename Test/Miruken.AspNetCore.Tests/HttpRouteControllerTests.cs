@@ -170,7 +170,7 @@
             {
                 batch.Send(new CreatePlayer { Player = player }
                         .RouteTo(_server.BaseAddress.AbsoluteUri))
-                    .Then((response, s) =>
+                    .Then((response, _) =>
                     {
                         Assert.AreEqual("Paul Pogba", response.Player.Name);
                         Assert.IsTrue(response.Player.Id > 0);
@@ -199,14 +199,14 @@
             {
                 batch.Send(new CreatePlayer { Player = player1 }
                         .RouteTo(_server.BaseAddress.AbsoluteUri))
-                    .Then((response, s) =>
+                    .Then((response, _) =>
                     {
                         Assert.AreEqual("Paul Pogba", response.Player.Name);
                         Assert.IsTrue(response.Player.Id > 0);
                     });
                 batch.Send(new CreatePlayer { Player = player2 }
                         .RouteTo(_server.BaseAddress.AbsoluteUri))
-                    .Then((response, s) =>
+                    .Then((response, _) =>
                     {
                         Assert.AreEqual("Eden Hazard", response.Player.Name);
                         Assert.IsTrue(response.Player.Id > 0);
@@ -280,15 +280,15 @@
             var results = await _handler.Batch(batch =>
                 batch.Send(new CreatePlayer { Player = new Player() }
                         .RouteTo(_server.BaseAddress.AbsoluteUri))
-                    .Then((_, s) => Assert.Fail("Should have failed"))
-                    .Catch((ValidationException vex, bool s) =>
+                    .Then((_, _) => Assert.Fail("Should have failed"))
+                    .Catch((ValidationException vex, bool _) =>
                     {
                         var outcome = vex.Outcome;
                         Assert.IsNotNull(outcome);
                         CollectionAssert.AreEqual(new[] { "Player" }, outcome.Culprits);
                         Assert.AreEqual("'Player Name' must not be empty.", outcome["Player.Name"]);
                     })
-                    .Catch((ex, s) => Assert.Fail("Unexpected exception")));
+                    .Catch((_, _) => Assert.Fail("Unexpected exception")));
             Assert.AreEqual(1, results.Length);
             var groups = (object[])results[0];
             Assert.AreEqual(1, groups.Length);
@@ -304,7 +304,7 @@
             {
                 batch.Send(new CreatePlayer { Player = new Player() }
                     .RouteTo(_server.BaseAddress.AbsoluteUri))
-                    .Catch((ValidationException vex, bool s) =>
+                    .Catch((ValidationException vex, bool _) =>
                     {
                         var outcome = vex.Outcome;
                         Assert.IsNotNull(outcome);
@@ -328,7 +328,7 @@
                         CollectionAssert.AreEqual(new[] { "Player" }, outcome.Culprits);
                         Assert.AreEqual("'Player. Id' should be equal to '0'.", outcome["Player.Id"]);
                     })
-                    .Catch((ex, s) => Assert.Fail("Unexpected exception"));
+                    .Catch((_, _) => Assert.Fail("Unexpected exception"));
             });
             Assert.AreEqual(1, results.Length);
             var groups = (object[])results[0];
@@ -361,7 +361,7 @@
             {
                 var errors = (ValidationErrors[])error.Payload;
                 Assert.AreEqual(1, errors.Length);
-            }, success => { Assert.Fail("Should have failed"); });
+            }, _ => { Assert.Fail("Should have failed"); });
         }
         
         [TestMethod]
