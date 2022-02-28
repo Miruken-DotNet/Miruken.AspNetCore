@@ -1,19 +1,18 @@
-﻿namespace Miruken.AspNetCore.SignalR.Test.Site.Pages
+﻿namespace Miruken.AspNetCore.SignalR.Test.Site.Pages;
+
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Logging;
+
+public class PrivacyModel : PageModel
 {
-    using Microsoft.AspNetCore.Mvc.RazorPages;
-    using Microsoft.Extensions.Logging;
+    private readonly ILogger<PrivacyModel> _logger;
 
-    public class PrivacyModel : PageModel
+    public PrivacyModel(ILogger<PrivacyModel> logger)
     {
-        private readonly ILogger<PrivacyModel> _logger;
+        _logger = logger;
+    }
 
-        public PrivacyModel(ILogger<PrivacyModel> logger)
-        {
-            _logger = logger;
-        }
-
-        public void OnGet()
-        {
-        }
+    public void OnGet()
+    {
     }
 }

@@ -11,11 +11,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Miruken.AspNetCore.Tests", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Miruken.AspNetCore.Swagger", "Source\Miruken.AspNetCore.Swagger\Miruken.AspNetCore.Swagger.csproj", "{5FAF9139-7D45-4159-ACC1-CE6C54998908}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Miruken.AspNetCore.Test.Site3_1", "Test\Miruken.AspNetCore.Test.Site3_1\Miruken.AspNetCore.Test.Site3_1.csproj", "{33D39044-BFB9-4ACC-98F5-2EDB041D4CAA}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Miruken.AspNetCore.SignalR.Test.Site", "Test\Miruken.AspNetCore.SignalR.Test.Site\Miruken.AspNetCore.SignalR.Test.Site.csproj", "{3A9E333C-912E-4D72-A161-D4EBF8AA21ED}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Miruken.AspNetCore.SignalR.Api", "Source\Miruken.AspNetCore.SignalR.Api\Miruken.AspNetCore.SignalR.Api.csproj", "{A1A9B9D5-8380-4088-9034-585EF20B953A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Miruken.AspNetCore.Test.Site", "Test\Miruken.AspNetCore.Test.Site\Miruken.AspNetCore.Test.Site.csproj", "{14F4F1D6-400F-48AA-BFCA-E1A7EF9FC205}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,10 +35,6 @@ Global
 		{5FAF9139-7D45-4159-ACC1-CE6C54998908}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5FAF9139-7D45-4159-ACC1-CE6C54998908}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5FAF9139-7D45-4159-ACC1-CE6C54998908}.Release|Any CPU.Build.0 = Release|Any CPU
-		{33D39044-BFB9-4ACC-98F5-2EDB041D4CAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{33D39044-BFB9-4ACC-98F5-2EDB041D4CAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{33D39044-BFB9-4ACC-98F5-2EDB041D4CAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{33D39044-BFB9-4ACC-98F5-2EDB041D4CAA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3A9E333C-912E-4D72-A161-D4EBF8AA21ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3A9E333C-912E-4D72-A161-D4EBF8AA21ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3A9E333C-912E-4D72-A161-D4EBF8AA21ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -47,14 +43,18 @@ Global
 		{A1A9B9D5-8380-4088-9034-585EF20B953A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1A9B9D5-8380-4088-9034-585EF20B953A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1A9B9D5-8380-4088-9034-585EF20B953A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{14F4F1D6-400F-48AA-BFCA-E1A7EF9FC205}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{14F4F1D6-400F-48AA-BFCA-E1A7EF9FC205}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{14F4F1D6-400F-48AA-BFCA-E1A7EF9FC205}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{14F4F1D6-400F-48AA-BFCA-E1A7EF9FC205}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{053884DC-7457-4FE3-9B6B-C256F5C99579} = {3B77294B-2ED8-4441-B854-E4078A54CEBE}
-		{33D39044-BFB9-4ACC-98F5-2EDB041D4CAA} = {3B77294B-2ED8-4441-B854-E4078A54CEBE}
 		{3A9E333C-912E-4D72-A161-D4EBF8AA21ED} = {3B77294B-2ED8-4441-B854-E4078A54CEBE}
+		{14F4F1D6-400F-48AA-BFCA-E1A7EF9FC205} = {3B77294B-2ED8-4441-B854-E4078A54CEBE}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D107F050-EF1F-4F18-A73B-514B2760FB99}

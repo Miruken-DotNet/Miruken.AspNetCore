@@ -1,4 +1,4 @@
-namespace Miruken.AspNetCore.Test.Site3_1
+namespace Miruken.AspNetCore.Test.Site
 {
     using Microsoft.AspNetCore.Builder;
     using Microsoft.Extensions.DependencyInjection;

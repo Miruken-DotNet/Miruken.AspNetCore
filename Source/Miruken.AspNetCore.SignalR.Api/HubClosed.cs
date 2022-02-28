@@ -1,9 +1,8 @@
-﻿namespace Miruken.AspNetCore.SignalR.Api
-{
-    using System;
+﻿namespace Miruken.AspNetCore.SignalR.Api;
 
-    public record HubClosed(
-        HubConnectionInfo ConnectionInfo,
-        Exception         Exception
-    ) : HubEvent(ConnectionInfo);
-}
+using System;
+
+public record HubClosed(
+    HubConnectionInfo ConnectionInfo,
+    Exception         Exception
+) : HubEvent(ConnectionInfo);

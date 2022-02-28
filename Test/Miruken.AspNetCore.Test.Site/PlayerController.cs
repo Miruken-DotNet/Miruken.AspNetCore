@@ -1,4 +1,4 @@
-﻿namespace Miruken.AspNetCore.Test.Site3_1
+﻿namespace Miruken.AspNetCore.Test.Site
 {
     using System.Diagnostics;
     using System.Threading.Tasks;

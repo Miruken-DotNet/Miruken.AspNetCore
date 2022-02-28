@@ -1,64 +1,63 @@
-﻿namespace Miruken.AspNetCore.Tests
-{
-    using Http;
-    using Microsoft.AspNetCore.Mvc;
-        
-    [Route("no-mapping")]
-    public class NoMappingController : ControllerBase
-    {
-        public class SomeError { }
+﻿namespace Miruken.AspNetCore.Tests;
 
-        [HttpPost, Route("process")]
-        public IActionResult Error([HttpRouteBody]Message _)
+using Http;
+using Microsoft.AspNetCore.Mvc;
+        
+[Route("no-mapping")]
+public class NoMappingController : ControllerBase
+{
+    public class SomeError { }
+
+    [HttpPost, Route("process")]
+    public IActionResult Error([HttpRouteBody]Message _)
+    {
+        return new ContentResult
         {
-            return new ContentResult
-            {
-                Content = @"{
+            Content = @"{
                        ""payload"": {
                            ""$type"": ""Miruken.AspNetCore.Tests.NoMappingController+SomeError, Miruken.AspNetCore.Tests""
                         }
                     }",
-                ContentType = "application/json",
-                StatusCode  = 500
-            };
-        }
+            ContentType = "application/json",
+            StatusCode  = 500
+        };
     }
+}
 
-    [Route("no-type-good")]
-    public class NoTypeGoodController : ControllerBase
+[Route("no-type-good")]
+public class NoTypeGoodController : ControllerBase
+{
+    [HttpPost, Route("process")]
+    public IActionResult Error([HttpRouteBody]Message _)
     {
-        [HttpPost, Route("process")]
-        public IActionResult Error([HttpRouteBody]Message _)
+        return new ContentResult
         {
-            return new ContentResult
-            {
-                Content = @"{
+            Content = @"{
                        ""payload"": {
                            ""$type"": ""Miruken.AspNetCore.Tests.SomeError, Miruken.AspNetCore.Tests""
                         }
                     }",
-                ContentType = "application/json",
-                StatusCode  = 200
-            };
-        }
+            ContentType = "application/json",
+            StatusCode  = 200
+        };
     }
+}
 
-    [Route("no-type-bad")]
-    public class NoTypeBadController : ControllerBase
+[Route("no-type-bad")]
+public class NoTypeBadController : ControllerBase
+{
+    [HttpPost, Route("process")]
+    public IActionResult Error([HttpRouteBody]Message _)
     {
-        [HttpPost, Route("process")]
-        public IActionResult Error([HttpRouteBody]Message _)
+        return new ContentResult
         {
-            return new ContentResult
-            {
-                Content = @"{
+            Content = @"{
                        ""payload"": {
                            ""$type"": ""Miruken.AspNetCore.Tests.SomeError, Miruken.AspNetCore.Tests""
                         }
                     }",
-                ContentType = "application/json",
-                StatusCode  = 500
-            };
-        }
+            ContentType = "application/json",
+            StatusCode  = 500
+        };
     }
 }

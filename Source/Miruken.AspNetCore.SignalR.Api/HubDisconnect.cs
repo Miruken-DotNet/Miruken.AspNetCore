@@ -1,6 +1,5 @@
-﻿namespace Miruken.AspNetCore.SignalR.Api
-{
-    using System;
+﻿namespace Miruken.AspNetCore.SignalR.Api;
 
-    public record HubDisconnect(Uri Url = null);
-}
+using System;
+
+public record HubDisconnect(Uri Url = null);

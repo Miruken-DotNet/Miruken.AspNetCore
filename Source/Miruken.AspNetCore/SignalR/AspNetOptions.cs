@@ -1,18 +1,17 @@
 ﻿// ReSharper disable CheckNamespace
-namespace Miruken.AspNetCore
-{
-    using Microsoft.AspNetCore.SignalR;
-    using Scrutor;
+namespace Miruken.AspNetCore;
 
-    public partial class AspNetOptions
+using Microsoft.AspNetCore.SignalR;
+using Scrutor;
+
+public partial class AspNetOptions
+{
+    public AspNetOptions AddHubs()
     {
-        public AspNetOptions AddHubs()
-        {
-            _registration.Select((selector, publicOnly) =>
-                selector.AddClasses(x => x.AssignableTo<Hub>(), publicOnly)
-                    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
-                    .AsSelf().WithScopedLifetime());
-            return this;
-        }
+        _registration.Select((selector, publicOnly) =>
+            selector.AddClasses(x => x.AssignableTo<Hub>(), publicOnly)
+                .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+                .AsSelf().WithScopedLifetime());
+        return this;
     }
 }

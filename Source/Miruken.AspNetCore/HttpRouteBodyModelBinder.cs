@@ -1,81 +1,80 @@
-﻿namespace Miruken.AspNetCore
+﻿namespace Miruken.AspNetCore;
+
+using System;
+using System.Buffers;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
+
+public class HttpRouteBodyModelBinder : IModelBinder
 {
-    using System;
-    using System.Buffers;
-    using System.IO;
-    using System.Text;
-    using System.Threading.Tasks;
-    using Http;
-    using Microsoft.AspNetCore.Mvc;
-    using Microsoft.AspNetCore.Mvc.Formatters;
-    using Microsoft.AspNetCore.Mvc.Infrastructure;
-    using Microsoft.AspNetCore.Mvc.ModelBinding;
-    using Microsoft.Extensions.Logging;
-    using Microsoft.Extensions.ObjectPool;
+    private readonly InputFormatter _input;
+    private readonly Func<Stream, Encoding, TextReader> _readerFactory;
 
-    public class HttpRouteBodyModelBinder : IModelBinder
+    public HttpRouteBodyModelBinder(
+        IHttpRequestStreamReaderFactory readerFactory,
+        ILoggerFactory loggerFactory, ArrayPool<char> charPool,
+        ObjectPoolProvider objectPoolProvider)
     {
-        private readonly InputFormatter _input;
-        private readonly Func<Stream, Encoding, TextReader> _readerFactory;
+        _input = new NewtonsoftJsonInputFormatter(
+            loggerFactory.CreateLogger(typeof(HttpRouteBodyModelBinder)),
+            HttpFormatters.Route.SerializerSettings, charPool,
+            objectPoolProvider, new MvcOptions(), new MvcNewtonsoftJsonOptions());
+        _readerFactory = readerFactory.CreateReader;         
+    }
 
-        public HttpRouteBodyModelBinder(
-            IHttpRequestStreamReaderFactory readerFactory,
-            ILoggerFactory loggerFactory, ArrayPool<char> charPool,
-            ObjectPoolProvider objectPoolProvider)
+    public async Task BindModelAsync(ModelBindingContext bindingContext)
+    {
+        var httpContext     = bindingContext.HttpContext;
+        var modelBindingKey = bindingContext.IsTopLevelObject
+            ? bindingContext.BinderModelName ?? string.Empty
+            : bindingContext.ModelName;
+
+        var formatterContext = new InputFormatterContext(
+            httpContext, modelBindingKey,
+            bindingContext.ModelState,
+            bindingContext.ModelMetadata,
+            _readerFactory, true);
+
+        try
         {
-            _input = new NewtonsoftJsonInputFormatter(
-                loggerFactory.CreateLogger(typeof(HttpRouteBodyModelBinder)),
-                HttpFormatters.Route.SerializerSettings, charPool,
-                objectPoolProvider, new MvcOptions(), new MvcNewtonsoftJsonOptions());
-            _readerFactory = readerFactory.CreateReader;         
-        }
+            var result = await _input.ReadAsync(formatterContext);
 
-        public async Task BindModelAsync(ModelBindingContext bindingContext)
-        {
-            var httpContext     = bindingContext.HttpContext;
-            var modelBindingKey = bindingContext.IsTopLevelObject
-                ? bindingContext.BinderModelName ?? string.Empty
-                : bindingContext.ModelName;
+            if (result.HasError) return;
 
-            var formatterContext = new InputFormatterContext(
-                httpContext, modelBindingKey,
-                bindingContext.ModelState,
-                bindingContext.ModelMetadata,
-                _readerFactory, true);
-
-            try
+            if (result.IsModelSet)
             {
-                var result = await _input.ReadAsync(formatterContext);
-
-                if (result.HasError) return;
-
-                if (result.IsModelSet)
-                {
-                    var model = result.Model;
-                    bindingContext.Result = ModelBindingResult.Success(model);
-                }
-                else
-                {
-                    var message = bindingContext
-                        .ModelMetadata
-                        .ModelBindingMessageProvider
-                        .MissingRequestBodyRequiredValueAccessor();
-                    bindingContext.ModelState.AddModelError(modelBindingKey, message);
-                }
+                var model = result.Model;
+                bindingContext.Result = ModelBindingResult.Success(model);
             }
-            catch (Exception exception) 
-                when (exception is InputFormatterException || ShouldHandleException(_input))
+            else
             {
-                bindingContext.ModelState.AddModelError(modelBindingKey,
-                    exception, bindingContext.ModelMetadata);
+                var message = bindingContext
+                    .ModelMetadata
+                    .ModelBindingMessageProvider
+                    .MissingRequestBodyRequiredValueAccessor();
+                bindingContext.ModelState.AddModelError(modelBindingKey, message);
             }
         }
-
-        private static bool ShouldHandleException(IInputFormatter formatter)
+        catch (Exception exception) 
+            when (exception is InputFormatterException || ShouldHandleException(_input))
         {
-            var policy = (formatter as IInputFormatterExceptionPolicy)?.ExceptionPolicy ??
-                         InputFormatterExceptionPolicy.MalformedInputExceptions;
-            return policy == InputFormatterExceptionPolicy.AllExceptions;
+            bindingContext.ModelState.AddModelError(modelBindingKey,
+                exception, bindingContext.ModelMetadata);
         }
+    }
+
+    private static bool ShouldHandleException(IInputFormatter formatter)
+    {
+        var policy = (formatter as IInputFormatterExceptionPolicy)?.ExceptionPolicy ??
+                     InputFormatterExceptionPolicy.MalformedInputExceptions;
+        return policy == InputFormatterExceptionPolicy.AllExceptions;
     }
 }

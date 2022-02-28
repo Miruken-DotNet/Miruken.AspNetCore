@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <Authors>cneuwirt</Authors>
     <Company>Miruken</Company>
     <Description>Asp.Net Core Integration with Miruken</Description>
@@ -11,7 +12,6 @@
     <PackageIconUrl>https://avatars0.githubusercontent.com/u/20844317</PackageIconUrl>
     <PackageTags>Miruken Asp.Net Core</PackageTags>
     <PackageReleaseNotes>Summary of changes made in this release of the package.</PackageReleaseNotes>
-    <LangVersion>latest</LangVersion>
     <OutputPath>bin\</OutputPath>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
@@ -21,11 +21,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Miruken" Version="5.0.1-Alpha.3" />
-    <PackageReference Include="Miruken.Http" Version="5.0.1-Alpha.3" />
-    <PackageReference Include="Miruken.Validate" Version="5.0.1-Alpha.3" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.0-beta-20204-02" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="5.0.5" />
+    <PackageReference Include="Miruken" Version="5.0.1-Alpha.9" />
+    <PackageReference Include="Miruken.Http" Version="5.0.1-Alpha.9" />
+    <PackageReference Include="Miruken.Validate" Version="5.0.1-Alpha.9" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="6.0.2" />
   </ItemGroup>
   
   <ItemGroup>

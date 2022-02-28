@@ -1,14 +1,13 @@
 ﻿
-namespace Miruken.AspNetCore
-{
-    using Microsoft.AspNetCore.Mvc;
-    using Microsoft.AspNetCore.Mvc.ModelBinding;
+namespace Miruken.AspNetCore;
 
-    public sealed class HttpRouteBodyAttribute : ModelBinderAttribute
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+
+public sealed class HttpRouteBodyAttribute : ModelBinderAttribute
+{
+    public HttpRouteBodyAttribute() : base(typeof(HttpRouteBodyModelBinder))
     {
-        public HttpRouteBodyAttribute() : base(typeof(HttpRouteBodyModelBinder))
-        {
-            BindingSource = BindingSource.Body;
-        }
+        BindingSource = BindingSource.Body;
     }
 }

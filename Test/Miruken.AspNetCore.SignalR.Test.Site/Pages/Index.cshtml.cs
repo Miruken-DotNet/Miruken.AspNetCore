@@ -1,20 +1,19 @@
-﻿namespace Miruken.AspNetCore.SignalR.Test.Site.Pages
+﻿namespace Miruken.AspNetCore.SignalR.Test.Site.Pages;
+
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Logging;
+
+public class IndexModel : PageModel
 {
-    using Microsoft.AspNetCore.Mvc.RazorPages;
-    using Microsoft.Extensions.Logging;
+    private readonly ILogger<IndexModel> _logger;
 
-    public class IndexModel : PageModel
+    public IndexModel(ILogger<IndexModel> logger)
     {
-        private readonly ILogger<IndexModel> _logger;
+        _logger = logger;
+    }
 
-        public IndexModel(ILogger<IndexModel> logger)
-        {
-            _logger = logger;
-        }
+    public void OnGet()
+    {
 
-        public void OnGet()
-        {
-
-        }
     }
 }
